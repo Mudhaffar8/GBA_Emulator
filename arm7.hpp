@@ -1,0 +1,170 @@
+#pragma once
+
+#include <array>
+#include <cstdint>
+
+namespace Arm7VectorAddr
+{
+    const uint32_t RESET = 0x0;
+    const uint32_t UNDEFINED = 0x4;
+    const uint32_t SWI = 0x8;
+    const uint32_t PREFETCH_ABORT = 0xC;
+    const uint32_t DATA_ABORT = 0X10;
+    const uint32_t RESERVED = 0x14;
+    const uint32_t IRQ = 0x18;
+    const uint32_t FIQ = 0x1C;
+
+}
+
+class Arm7TDMI 
+{
+public:
+    Arm7TDMI();
+
+    void tick();
+
+private:
+    enum ConditionCode
+    {
+        EQ = 0b0000, // Equal, Z = 1
+        NE = 0b0001, // Not Equal, Z = 0
+        CS = 0b0010, // Unsigned higher or same, C = 1
+        CC = 0b0011, // Unsigned lower, C = 0
+        MI = 0b0100, // Negative, N = 1
+        PL = 0b0101, // Positive or Zero, N = 0
+        VS = 0b0110, // Overflow, V = 1
+        VC = 0b0111, // No Overflow, V = 0
+        HI = 0b1000, // Unsigned Higher, C = 1 and Z = 0
+        LS = 0b1001, // Unsigned Lower or Same, C = 0 or Z = 1
+        GE = 0b1010, // Unsigned Higher, N = V
+        LT = 0b1011, // Less than, N <> V
+        GT = 0b1100, // Greater than, Z = 0 and (N = V)
+        LE = 0b1101, // Less than or Equal, Z = 1 or (N <> V)
+        AL = 0b1110, // Always executes
+        // 0b1111 is reserved and must not be used
+    };
+
+    enum CpuMode 
+    {
+        User = 0b10000,
+        FastInterrupt = 0b10001,
+        InterruptRequest = 0b10010,
+        Supervisor = 0b10011,
+        Abort = 0b10111,
+        Undefined = 0b11011,
+        System = 0b11111
+    };
+
+    enum CpuState
+    {
+        Arm = 0x00,
+        Thumb = 0x20
+    };
+
+    enum ProgramStatusRegsiter
+    {
+        /* Condition Code Flags */
+        N = (1 << 31), // Negative or less than
+        Z = (1 << 30), // Zero
+        C = (1 << 29), // Carry or borrow or extend
+        V = (1 << 28), // Overflow
+        
+        /* Interrupts */
+        I = (1 << 7), // IRQ Disable
+        F = (1 << 6), // FIQ Disable
+
+        T = (1 << 7), // State bit
+        Mode = 0x1F  // Mode bit
+    };
+
+private:
+    using ArmFunc = void (Arm7TDMI::*)(uint32_t opcode);
+    using ThumbFunc = void (Arm7TDMI::*)(uint16_t opcode);
+
+    const uint32_t LINK = 13;
+    const uint32_t SP = 14;
+    const uint32_t PC = 15;
+
+    std::array<ArmFunc, 4096> arm_instr_table = generate_arm_table();
+    std::array<ThumbFunc, 256> thumb_instr_table = generate_thumb_table();
+
+    /* Registers */
+    // General Purpose Registers
+    uint32_t r0{}, r1{}, r2{}, r3{}, r4{}, r5{}, r6{}, r7{}; 
+    uint32_t r8{}, r9{}, r10{}, r11{}, r12{}, r13{}, r14{}, r15{}; // System and User share the same registers
+    uint32_t r8_fiq{}, r9_fiq{}, r10_fiq{}, r11_fiq{}, r12_fiq{}, r13_fiq{}, r14_fiq{}; // Fast Interrupt
+    uint32_t r13_svc{}, r14_svc{}; // Supervisor
+    uint32_t r13_abt{}, r14_abt{}; // Abort
+    uint32_t r13_irq{}, r14_irq{}; // IRQ
+    uint32_t r13_und{}, r14_und{}; // Undefined
+    
+    std::array<uint32_t*, 16> registers 
+    {{
+        &r0, &r1, &r2, &r3, &r4, &r5, &r6, &r7,
+        &r8, &r9, &r10, &r11, &r12, &r13, &r14, &r15
+    }};
+
+    uint32_t* pc = registers[PC];
+    uint32_t* sp = registers[SP];
+    uint32_t* link = registers[LINK];
+
+    // Program Status Registers
+    uint32_t cpsr{};
+    uint32_t spsr_fiq{}, spsr_svc{}, spsr_abt{}, spsr_irq{}, spsr_und{};
+
+    CpuMode mode = CpuMode::User;
+    CpuState state = CpuState::Arm;
+private:
+    /* Instruction Table Dispatch */
+    std::array<ArmFunc, 4096> generate_arm_table();
+    std::array<ThumbFunc, 256> generate_thumb_table();
+
+    void arm_execute();
+    void thumb_execute();
+
+    void handle_mode_switch(CpuMode new_mode);
+    void handle_state_switch(CpuState new_state);
+
+    bool check_condition_code(uint32_t code);
+    inline bool n_set() { return cpsr & ProgramStatusRegsiter::N; }
+    inline bool z_set() { return cpsr & ProgramStatusRegsiter::Z; }
+    inline bool c_set() { return cpsr & ProgramStatusRegsiter::C; }
+    inline bool v_set() { return cpsr & ProgramStatusRegsiter::V; }
+
+    /* ARM Instructions */
+    void arm_branch(uint32_t opcode); // Branch, Branch and Link
+    void arm_branch_and_exchange(uint32_t opcode);
+    void arm_coprocessor_data_operation(uint32_t opcode);
+    void arm_coprocessor_data_transfer(uint32_t opcode);
+    void arm_coprocessor_register_transfer(uint32_t opcode);
+    void arm_data_processing(uint32_t opcode);
+    void arm_halfword_data_transfer(uint32_t opcode);
+    void arm_multiply(uint32_t opcode);
+    void arm_multiply_long(uint32_t opcode);
+    void arm_software_interrupt(uint32_t opcode);
+    void arm_single_data_swap(uint32_t opcode);
+    void arm_single_data_transfer(uint32_t opcode);
+    void arm_undefined(uint32_t opcode);
+
+    /* THUMB Instructions */
+    // I gotta find shorter method names
+    void thumb_add_subtract(uint16_t opcode);
+    void thumb_add_offset_sp(uint16_t opcode); // stack pointer
+    void thumb_alu_operations(uint16_t opcode);
+    void thumb_conditional_branch(uint16_t opcode);
+    void thumb_hi_reg_op_branch_exchange(uint16_t opcode);
+    void thumb_load_address(uint16_t opcode);
+    void thumb_load_store_halfword(uint16_t opcode);
+    void thumb_load_store_immediate(uint16_t opcode);
+    void thumb_load_store_w_reg_offset(uint16_t opcode);
+    void thumb_sign_extend(uint16_t opcode);
+    void thumb_long_branch_w_link(uint16_t opcode);
+    void thumb_move_cmp_add_sub_immediate(uint16_t opcode);
+    void thumb_move_shifted_register(uint16_t opcode);
+    void thumb_multiple_load_store(uint16_t opcode);
+    void thumb_pc_relative_load(uint16_t opcode);
+    void thumb_push_pop_registers(uint16_t opcode);
+    void thumb_software_interrupt(uint16_t opcode);
+    void thumb_sp_relative_load_store(uint16_t opcode);
+    void thumb_unconditional_branch(uint16_t opcode);
+};
