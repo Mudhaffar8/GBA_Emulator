@@ -1,7 +1,5 @@
 #include "arm7.hpp"
 
-#include "utils.hpp"
-
 // 2S + 1N Incremental Cycles
 void Arm7TDMI::arm_branch(uint32_t opcode)
 {
@@ -9,12 +7,12 @@ void Arm7TDMI::arm_branch(uint32_t opcode)
     int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 2;
     
     if (Utils::is_bit_set(opcode, 24)) // Branch with Link
-        *registers[LINK] = *registers[PC] - 4;
+        link = pc - 4;
 
     // The branch offset must take account of the prefetch operation, 
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
-    *registers[PC] += sign_extended_offset;
-    *registers[PC] -= 8; // 
+    pc += sign_extended_offset;
+    pc -= 8; // Do I really need to emulate this?
 }
 
 // 2S + 1N Cycles
@@ -24,16 +22,7 @@ void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
     uint32_t rn = Utils::get_bits(opcode, 0, 4);
     uint32_t address = *registers[rn];
 
-    if (address & 1)
-    {
-        *registers[PC] = address & ~1;
-        handle_state_switch(CpuState::Thumb);
-    }
-    else
-    {
-        *registers[PC] = address & ~3;
-        handle_state_switch(CpuState::Arm);
-    }
+    branch_and_exchange(address);
 }
 
 void Arm7TDMI::arm_multiply(uint32_t opcode)

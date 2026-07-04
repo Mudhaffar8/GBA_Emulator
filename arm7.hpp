@@ -2,6 +2,12 @@
 
 #include <array>
 #include <cstdint>
+#include <cassert>
+#include <limits>
+#include <stdexcept>
+
+#include "memory.hpp"
+#include "utils.hpp"
 
 namespace Arm7VectorAddr
 {
@@ -19,7 +25,7 @@ namespace Arm7VectorAddr
 class Arm7TDMI 
 {
 public:
-    Arm7TDMI();
+    Arm7TDMI(Memory& memory);
 
     void tick();
 
@@ -66,8 +72,8 @@ private:
         /* Condition Code Flags */
         N = (1 << 31), // Negative or less than
         Z = (1 << 30), // Zero
-        C = (1 << 29), // Carry or borrow or extend
-        V = (1 << 28), // Overflow
+        C = (1 << 29), // Carry or borrow or extend, unsigned
+        V = (1 << 28), // Overflow, signed
         
         /* Interrupts */
         I = (1 << 7), // IRQ Disable
@@ -81,12 +87,10 @@ private:
     using ArmFunc = void (Arm7TDMI::*)(uint32_t opcode);
     using ThumbFunc = void (Arm7TDMI::*)(uint16_t opcode);
 
-    const uint32_t LINK = 13;
-    const uint32_t SP = 14;
-    const uint32_t PC = 15;
-
     std::array<ArmFunc, 4096> arm_instr_table = generate_arm_table();
     std::array<ThumbFunc, 256> thumb_instr_table = generate_thumb_table();
+
+    Memory& memory;
 
     /* Registers */
     // General Purpose Registers
@@ -104,9 +108,9 @@ private:
         &r8, &r9, &r10, &r11, &r12, &r13, &r14, &r15
     }};
 
-    uint32_t* pc = registers[PC];
-    uint32_t* sp = registers[SP];
-    uint32_t* link = registers[LINK];
+    uint32_t& pc = *registers[15];
+    uint32_t& sp = *registers[14];
+    uint32_t& link = *registers[13];
 
     // Program Status Registers
     uint32_t cpsr{};
@@ -114,6 +118,7 @@ private:
 
     CpuMode mode = CpuMode::User;
     CpuState state = CpuState::Arm;
+
 private:
     /* Instruction Table Dispatch */
     std::array<ArmFunc, 4096> generate_arm_table();
@@ -126,10 +131,39 @@ private:
     void handle_state_switch(CpuState new_state);
 
     bool check_condition_code(uint32_t code);
+    constexpr void set_cpsr(ProgramStatusRegsiter bit, bool cond) { cpsr = (cond) ? (cpsr | bit) : (cpsr & ~bit); }
+    inline void set_negative_and_zero(uint32_t num) 
+    { 
+        set_cpsr(ProgramStatusRegsiter::N, num & Utils::MSB32);
+        set_cpsr(ProgramStatusRegsiter::Z, num == 0);
+    }
     inline bool n_set() { return cpsr & ProgramStatusRegsiter::N; }
     inline bool z_set() { return cpsr & ProgramStatusRegsiter::Z; }
     inline bool c_set() { return cpsr & ProgramStatusRegsiter::C; }
     inline bool v_set() { return cpsr & ProgramStatusRegsiter::V; }
+
+    /* Math & Logical Operations */
+    uint32_t alu_add_cmn(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_adc(uint32_t op1, uint32_t op2, bool set_cc); // add with carry
+    uint32_t alu_and_tst(uint32_t op1, uint32_t op2, bool set_cc); // AND
+    uint32_t alu_bic(uint32_t op1, uint32_t op2, bool set_cc); // BIC, Rd = Op1 AND NOT Op2
+    uint32_t alu_eor_teq(uint32_t op1, uint32_t op2, bool set_cc); // Exclusive OR
+    uint32_t alu_mov(uint32_t op2, bool set_cc); // RD:= op2
+    uint32_t alu_mvn(uint32_t op2, bool set_cc);
+    uint32_t alu_orr(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_rsb(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_rsc(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_sbc(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_sub_cmp(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_lsl(uint32_t op1, uint32_t op2, bool set_cc); // Logical Shift Left
+    uint32_t alu_lsr(uint32_t op1,uint32_t op2, bool set_cc); // Logical Shift Right
+    uint32_t alu_asr(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_ror(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_mul(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t decode_shift_operation(uint32_t op1, uint32_t op2, int shift_type);
+
+    /* Branching */
+    void branch_and_exchange(uint32_t address);
 
     /* ARM Instructions */
     void arm_branch(uint32_t opcode); // Branch, Branch and Link
@@ -157,7 +191,6 @@ private:
     void thumb_load_store_halfword(uint16_t opcode);
     void thumb_load_store_immediate(uint16_t opcode);
     void thumb_load_store_w_reg_offset(uint16_t opcode);
-    void thumb_sign_extend(uint16_t opcode);
     void thumb_long_branch_w_link(uint16_t opcode);
     void thumb_move_cmp_add_sub_immediate(uint16_t opcode);
     void thumb_move_shifted_register(uint16_t opcode);
@@ -167,4 +200,23 @@ private:
     void thumb_software_interrupt(uint16_t opcode);
     void thumb_sp_relative_load_store(uint16_t opcode);
     void thumb_unconditional_branch(uint16_t opcode);
+
+    /* Thumb Helper Methods */
+    inline std::pair<uint32_t&, uint32_t&> thumb_get_dst_src(uint16_t opcode) const
+    {
+        int dst_reg_index = Utils::get_bits(opcode, 0, 3);
+        int src_reg_index = Utils::get_bits(opcode, 3, 6);
+
+        uint32_t& dest_register = *registers[dst_reg_index];
+        uint32_t& src_register = *registers[src_reg_index];
+
+        return {dest_register, src_register};
+    }
+
+    inline uint32_t& thumb_get_dst(uint16_t opcode) const
+    {
+        int dst_reg_index = Utils::get_bits(opcode, 8, 11);
+        uint32_t& dest_register = *registers[dst_reg_index];
+        return dest_register;
+    }
 };

@@ -2,9 +2,8 @@
 
 #include <stdexcept>
 
-#include "utils.hpp"
-
-Arm7TDMI::Arm7TDMI() 
+Arm7TDMI::Arm7TDMI(Memory& _memory) : 
+    memory(_memory)
 {}
 
 
@@ -96,6 +95,20 @@ void Arm7TDMI::handle_state_switch(CpuState new_state)
     state = new_state;
     cpsr &= ~new_state;
     cpsr |= new_state;
+}
+
+void Arm7TDMI::branch_and_exchange(uint32_t address)
+{
+    if (address & 1)
+    {
+        pc = address & ~1;
+        handle_state_switch(CpuState::Thumb);
+    }
+    else
+    {
+        pc = address & ~3;
+        handle_state_switch(CpuState::Arm);
+    }
 }
 
 
