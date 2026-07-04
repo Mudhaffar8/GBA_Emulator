@@ -196,9 +196,8 @@ uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc)
         result |= (bits_shifted_out << (32 - op2)); // Check the math here
     }
     if (set_cc)
-    {
         set_negative_and_zero(result);
-    }
+    
     return result;
 }
 

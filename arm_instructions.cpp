@@ -50,5 +50,21 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     /// @todo
 }
 
+// 2S + 1N Cycles
+void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
+{
+    /// @note The bottom 24 bits of the instruction are ignored by the processor
+    handle_state_switch(CpuState::Arm);
+    handle_mode_switch(CpuMode::Supervisor);
+    link = pc - 4;
+    pc = Arm7VectorAddr::SWI;
+}
+
+// 2S + 1I + 1N cycles
 void Arm7TDMI::arm_undefined(uint32_t opcode)
-{}
+{
+    handle_state_switch(CpuState::Arm);
+    handle_mode_switch(CpuMode::Supervisor);
+    link = pc - 4;
+    pc = Arm7VectorAddr::UNDEFINED;
+}

@@ -14,11 +14,11 @@ void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 
 void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
 {
-    bool is_immediate = Utils::is_bit_set(opcode, 10);
-    bool is_sub = Utils::is_bit_set(opcode, 9);
-    int rn_or_offset3 = Utils::get_bits(opcode, 6, 9);
-
     auto& [dest_register, src_register] = thumb_get_dst_src(opcode);
+
+    int rn_or_offset3 = Utils::get_bits(opcode, 6, 9);
+    bool is_sub = Utils::is_bit_set(opcode, 9);
+    bool is_immediate = Utils::is_bit_set(opcode, 10);
 
     uint32_t operand2 = (is_immediate) ? rn_or_offset3 : *registers[rn_or_offset3];
 
@@ -29,10 +29,10 @@ void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
 
 void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 {
-    bool set_condition_codes = Utils::is_bit_set(opcode, 20);
-    int operation = Utils::get_bits(opcode, 6, 10);
-
     auto& [dest_register, src_register] = thumb_get_dst_src(opcode);
+
+    int operation = Utils::get_bits(opcode, 6, 10);
+    bool set_condition_codes = Utils::is_bit_set(opcode, 20);
 
     switch (operation)
     {
@@ -85,6 +85,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         dest_register = alu_mvn(dest_register, true);
         break;
     default:
+        throw std::runtime_error("ERROR (THUMB HI REG Operation): " + operation);
         break;
     }
 }
@@ -137,11 +138,10 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
 void Arm7TDMI::thumb_load_address(uint16_t opcode)
 {
     // The CPSR condition codes are unaffected by these instructions.
-
-    bool is_stack_pointer = Utils::is_bit_set(opcode, 11);
-    uint32_t immediate = Utils::get_bits(opcode, 0, 8) << 2;
-
     auto& dest_register = thumb_get_dst(opcode);
+
+    uint32_t immediate = Utils::get_bits(opcode, 0, 8) << 2;
+    bool is_stack_pointer = Utils::is_bit_set(opcode, 11);
 
     if (is_stack_pointer) 
         dest_register = (sp + immediate);
@@ -155,24 +155,98 @@ void Arm7TDMI::thumb_load_address(uint16_t opcode)
 }
 
 void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
-{
-    auto& [dest_register, base_register] = thumb_get_dst_src(opcode);
+{ 
+    auto& [dst_src_register, base_register] = thumb_get_dst_src(opcode);
+    
+    uint32_t offset6 = Utils::get_bits(opcode, 6, 11);
+    bool is_load = Utils::is_bit_set(opcode, 11);
+
+    base_register += offset6;
+
+    if (is_load)
+    {
+        dst_src_register = memory.read16(base_register);
+        dst_src_register &= 0xFFFF;
+    }
+    else 
+        memory.write16(dst_src_register & 0xFFFF, base_register);
 }
 
 void Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
-{}
+{
+    auto& [dst_src_register, base_register] = thumb_get_dst_src(opcode);
+
+    uint32_t offset5 = Utils::get_bits(opcode, 6, 11);
+    bool is_load = Utils::is_bit_set(opcode, 11);
+    bool is_byte = Utils::is_bit_set(opcode, 12);
+
+    if (is_byte) 
+    {
+        base_register += offset5;
+        if (is_load)
+            dst_src_register = memory.read8(base_register);
+        else 
+            memory.write8(dst_src_register, base_register);
+    }   
+    else 
+    {
+        offset5 <<= 2;     
+        base_register += offset5;
+        if (is_load)
+            dst_src_register = memory.read32(base_register);
+        else 
+            memory.write32(dst_src_register, base_register);
+    }
+}
+
+void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
+{
+    auto& [dst_register, base_register] = thumb_get_dst_src(opcode);
+
+    uint32_t& offset_register = *registers[Utils::get_bits(opcode, 6, 9)];
+    uint32_t word8 = Utils::get_bits(opcode, 0, 8);
+    bool is_byte = Utils::is_bit_set(opcode, 10);
+    bool is_load = Utils::is_bit_set(opcode, 11);
+
+    uint32_t final_addr = base_register + offset_register;
+
+    if (is_byte) 
+    {
+        if (is_load)
+            dst_register = memory.read8(final_addr);
+        else 
+            memory.write8(dst_register, final_addr);
+    }   
+    else 
+    {
+        if (is_load)
+            dst_register = memory.read32(final_addr);
+        else 
+            memory.write32(dst_register, final_addr);
+    }
+}
 
 void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 {
+    uint32_t offset = Utils::get_bits(offset, 0, 11);
+    bool is_offset_low = Utils::is_bit_set(opcode, 11);
 
+    if (is_offset_low)
+    {
+        uint32_t temp = pc - 2;
+        pc = link + (offset << 1);
+        link = temp | 1;
+    }
+    else
+        link = pc + (offset << 12);
 }
 
 void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
 {
+    auto& dest_register = thumb_get_dst(opcode);
+
     int operation = Utils::get_bits(opcode, 11, 13);
     int offset = Utils::get_bits(opcode, 0, 8);
-
-    auto& dest_register = thumb_get_dst(opcode);
 
     switch(operation)
     {
@@ -193,22 +267,20 @@ void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
 
 void Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
 {
+    auto& [dest_register, src_register] = thumb_get_dst_src(opcode);
+
     int operation = Utils::get_bits(opcode, 11, 13);
     uint32_t offset5 = Utils::get_bits(opcode, 6, 11);
-
-    auto [dest_register, src_register] = thumb_get_dst_src(opcode);
 
     dest_register = decode_shift_operation(src_register, offset5, operation);
 }
 
 void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 {
-    bool is_load = Utils::is_bit_set(opcode, 11);
+    uint32_t& base_register = thumb_get_dst(opcode);
 
     uint32_t r_list = Utils::get_bits(opcode, 0, 8);
-
-    int base_reg_index = Utils::get_bits(opcode, 8, 11);
-    uint32_t& base_register = *registers[base_reg_index];
+    bool is_load = Utils::is_bit_set(opcode, 11);
 
     for (int i = 0; i < 8; ++i)
     {
@@ -216,9 +288,9 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
         if (!reg_index) continue;
 
         if (is_load)
-            memory.write32(*registers[i], base_register);
-        else 
             *registers[i] = memory.read32(base_register);
+        else 
+            memory.write32(*registers[i], base_register);
 
         base_register += 4;
     }
@@ -230,12 +302,36 @@ void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
     // 1020 bytes) in Imm to the current
     // value of the PC. Load the word
     // from the resulting address into Rd
-    uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
-
     auto& dest_register = thumb_get_dst(opcode);
+
+    uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
 
     pc += immediate10;
     dest_register = memory.read32(pc);
+}
+
+void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
+{
+    int r_list = Utils::get_bits(opcode, 0, 8);
+    bool pc_lr_bit = Utils::is_bit_set(opcode, 8);
+    bool is_pop = Utils::is_bit_set(opcode, 11);
+
+    for (int i = 0; i < 8; ++i)
+    {
+        int reg_index = (r_list >> i) & 1;
+        if (!reg_index) continue;
+
+        if (is_pop)
+        {
+            *registers[i] = memory.read32(sp);
+            sp += 4;
+        }
+        else
+        { 
+            memory.write32(*registers[i], sp);
+            sp -= 4;
+        }
+    }
 }
 
 void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
@@ -249,18 +345,17 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 
 void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
 {
-    bool is_load = Utils::is_bit_set(opcode, 11);
-
+    uint32_t& dest_register = thumb_get_dst(opcode);
+    
     uint32_t unsigned_offset10 = Utils::get_bits(opcode, 0, 8) << 2;
-
-    auto& dest_register = thumb_get_dst(opcode);
+    bool is_load = Utils::is_bit_set(opcode, 11);
 
     sp += unsigned_offset10;
 
     if (is_load)
-        memory.write32(dest_register, sp);
-    else 
         dest_register = memory.read32(sp);
+    else 
+        memory.write32(dest_register, sp);
 }
 
 void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
