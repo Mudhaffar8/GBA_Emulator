@@ -5,47 +5,40 @@
 #include "utils.hpp"
 
 Memory::Memory() : 
-    memory(0xE010000, 0)
+    game_pak_rom1(0x2000000, 0),
+    game_pak_rom2(0x2000000, 0),
+    game_pak_rom3(0x2000000, 0)
 {}
-
-void Memory::write8(uint8_t byte, uint32_t address)
-{
-    memory.at(address) = byte;
-}
 
 void Memory::write16(uint16_t half_word, uint32_t address)
 {
-    memory.at(address) = (half_word & 0xFF);
-    memory.at(address + 1) = half_word >> 8;
+    write8(half_word & 0xFF, address);
+    write8(half_word >> 8, address + 1);
 }
 
 void Memory::write32(uint32_t word, uint32_t address)
 {
-    memory.at(address) = (word & 0xFF);
-    memory.at(address + 1) = (word >> 8) & 0xFF;
-    memory.at(address + 2) = (word >> 16) & 0xFF;
-    memory.at(address + 3) = (word >> 24) & 0xFF;
+    write8(word & 0xFF, address);
+    write8((word >> 8) & 0xFF, address + 1);
+    write8((word >> 16) & 0xFF, address + 2);
+    write8((word >> 24) & 0xFF, address + 3);
 }
 
-uint8_t Memory::read8(uint32_t address)
-{
-    return memory.at(address);
-}
 
 uint16_t Memory::read16(uint32_t address)
 {
-    return memory.at(address) | (memory.at(address + 1) << 8);
+    return read8(address) | (read8(address + 1) << 8);
 }
 
 uint32_t Memory::read32(uint32_t address)
 {  
-    return memory.at(address) | 
-        (memory.at(address + 1) << 8) | 
-        (memory.at(address + 2) << 16) | 
-        (memory.at(address + 3) << 24); 
+    return read8(address) | 
+        (read8(address + 1) << 8) | 
+        (read8(address + 2) << 16) | 
+        (read8(address + 3) << 24); 
 }
 
-uint8_t Memory::read_byte(uint32_t address)
+uint8_t Memory::read8(uint32_t address)
 {
     // The memory map is so clean :o
     switch(address & Utils::MSB32)
@@ -79,7 +72,7 @@ uint8_t Memory::read_byte(uint32_t address)
     return 0;
 }
 
-void Memory::write_byte(uint8_t byte, uint32_t address)
+void Memory::write8(uint8_t byte, uint32_t address)
 {
     switch(address & Utils::MSB32)
     {

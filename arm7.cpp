@@ -1,10 +1,21 @@
 #include "arm7.hpp"
 
+#include <bitset>
+#include <iostream>
 #include <stdexcept>
 
 Arm7TDMI::Arm7TDMI(Memory& _memory) : 
     memory(_memory)
 {}
+
+void Arm7TDMI::test()
+{
+    for (uint16_t op = 0; op < 256; ++op)
+    {
+        std::cout << "Opcode: " << std::bitset<16>(op << 8) << ", ";
+        thumb_execute(op << 8);
+    }
+}   
 
 
 bool Arm7TDMI::check_condition_code(uint32_t code)
@@ -111,6 +122,11 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
     }
 }
 
+/* */
+void Arm7TDMI::thumb_execute(uint16_t opcode)
+{
+    (this->*thumb_instr_table[opcode >> 8])(opcode);
+}
 
 /* Instruction Decoding */
 std::array<Arm7TDMI::ArmFunc, 4096> Arm7TDMI::generate_arm_table()
@@ -124,5 +140,83 @@ std::array<Arm7TDMI::ThumbFunc, 256> Arm7TDMI::generate_thumb_table()
 {
     // It seems only bits 8-15 are needed to decode the instruction
     std::array<ThumbFunc, 256> table{};
+
+    for (int i = 0; i < 256; ++i)
+    {
+        int last_three_bits = (i & 0xE0) >> 5;
+        
+        switch(last_three_bits)
+        {
+        case 0:
+            table[i] = (Utils::get_bits(i, 3, 5) == 0b11) ? 
+                &thumb_add_subtract : 
+                &thumb_move_shifted_register;
+            break;
+
+        case 0b001:
+            table[i] = &thumb_move_cmp_add_sub_immediate;
+            break;
+        
+        case 0b010:
+            if (Utils::get_bits(i, 2, 5) == 0)
+                table[i] = &thumb_alu_operations;
+
+            else if (Utils::get_bits(i, 2, 5) == 0b001)
+                table[i] = &thumb_hi_reg_op_branch_exchange;
+
+            else if (Utils::get_bits(i, 3, 5) == 0b01)
+                table[i] = &thumb_pc_relative_load;
+
+            else if (Utils::is_bit_set(i, 1) && Utils::is_bit_set(i, 4))
+                table[i] = &thumb_load_store_sign_extend_halfword;
+
+            else    
+                table[i] = &thumb_load_store_w_reg_offset;
+            break;
+
+        case 0b011:
+            table[i] = &thumb_load_store_immediate;
+            break;
+
+        case 0b100:
+            table[i] = (Utils::is_bit_set(i, 4)) ? 
+                &thumb_sp_relative_load_store : 
+                &thumb_load_store_halfword;
+            break;
+    
+        case 0b101:
+            if (!Utils::is_bit_set(i, 4))
+                table[i] = &thumb_load_address;
+            else if (Utils::get_bits(i, 0, 4) == 0b0000)
+                table[i] = &thumb_add_offset_sp;
+            else if (Utils::get_bits(i, 1, 3) == 0b10)
+                table[i] = &thumb_push_pop_registers;
+            else 
+                table[i] = &thumb_undefined;
+            break;
+
+        // 1011'0001
+
+        case 0b110:
+            if (!Utils::is_bit_set(i, 4))
+                table[i] = &thumb_multiple_load_store;
+            else if (i == 0b11011111)
+                table[i] = &thumb_software_interrupt;
+            else 
+                table[i] = &thumb_conditional_branch;
+            break;
+
+        case 0b111:
+            if (Utils::get_bits(i, 3, 5) == 0b00)
+                table[i] = &thumb_unconditional_branch;
+
+            if (Utils::is_bit_set(i, 4))
+                table[i] = &thumb_long_branch_w_link;
+    
+            else 
+                table[i] = &thumb_undefined;
+            break;
+        }
+    }
     return table;
 }

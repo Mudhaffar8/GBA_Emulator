@@ -12,7 +12,7 @@ void Arm7TDMI::arm_branch(uint32_t opcode)
     // The branch offset must take account of the prefetch operation, 
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
     pc += sign_extended_offset;
-    pc -= 8; // Do I really need to emulate this?
+    pc -= 8; // Yes I do
 }
 
 // 2S + 1N Cycles

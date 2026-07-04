@@ -28,6 +28,7 @@ public:
     Arm7TDMI(Memory& memory);
 
     void tick();
+    void test();
 
 private:
     enum ConditionCode
@@ -124,8 +125,8 @@ private:
     std::array<ArmFunc, 4096> generate_arm_table();
     std::array<ThumbFunc, 256> generate_thumb_table();
 
-    void arm_execute();
-    void thumb_execute();
+    void arm_execute(uint32_t opcode);
+    void thumb_execute(uint16_t opcode);
 
     void handle_mode_switch(CpuMode new_mode);
     void handle_state_switch(CpuState new_state);
@@ -190,6 +191,7 @@ private:
     void thumb_load_address(uint16_t opcode);
     void thumb_load_store_halfword(uint16_t opcode);
     void thumb_load_store_immediate(uint16_t opcode);
+    void thumb_load_store_sign_extend_halfword(uint16_t opcode);
     void thumb_load_store_w_reg_offset(uint16_t opcode);
     void thumb_long_branch_w_link(uint16_t opcode);
     void thumb_move_cmp_add_sub_immediate(uint16_t opcode);
@@ -200,6 +202,7 @@ private:
     void thumb_software_interrupt(uint16_t opcode);
     void thumb_sp_relative_load_store(uint16_t opcode);
     void thumb_unconditional_branch(uint16_t opcode);
+    void thumb_undefined(uint16_t opcode);
 
     /* Thumb Helper Methods */
     inline std::pair<uint32_t&, uint32_t&> thumb_get_dst_src(uint16_t opcode) const
