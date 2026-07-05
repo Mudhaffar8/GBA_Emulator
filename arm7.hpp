@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cassert>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 
@@ -25,7 +26,7 @@ namespace Arm7VectorAddr
 class Arm7TDMI 
 {
 public:
-    Arm7TDMI(Memory& memory);
+    Arm7TDMI(FakeMemory& memory);
 
     void tick();
     void test();
@@ -91,7 +92,7 @@ private:
     std::array<ArmFunc, 4096> arm_instr_table = generate_arm_table();
     std::array<ThumbFunc, 256> thumb_instr_table = generate_thumb_table();
 
-    Memory& memory;
+    FakeMemory& memory;
 
     /* Registers */
     // General Purpose Registers
@@ -210,8 +211,14 @@ private:
         int dst_reg_index = Utils::get_bits(opcode, 0, 3);
         int src_reg_index = Utils::get_bits(opcode, 3, 6);
 
+        std::cout << "Destination Idx: " << dst_reg_index << '\n';
+        std::cout << "Source Idx: " << src_reg_index << '\n';
+
         uint32_t& dest_register = *registers[dst_reg_index];
         uint32_t& src_register = *registers[src_reg_index];
+
+        std::cout << "Dest Register Value: " << dest_register << '\n';
+        std::cout << "Src Register Value: " << src_register << '\n';
 
         return {dest_register, src_register};
     }
@@ -222,4 +229,6 @@ private:
         uint32_t& dest_register = *registers[dst_reg_index];
         return dest_register;
     }
+
+    friend class GBATests;
 };

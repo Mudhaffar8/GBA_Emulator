@@ -4,7 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 
-Arm7TDMI::Arm7TDMI(Memory& _memory) : 
+Arm7TDMI::Arm7TDMI(FakeMemory& _memory) : 
     memory(_memory)
 {}
 
@@ -123,9 +123,13 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
 }
 
 /* */
+void Arm7TDMI::arm_execute(uint32_t opcode)
+{}
+
 void Arm7TDMI::thumb_execute(uint16_t opcode)
 {
     (this->*thumb_instr_table[opcode >> 8])(opcode);
+    pc += 2;
 }
 
 /* Instruction Decoding */
@@ -210,7 +214,7 @@ std::array<Arm7TDMI::ThumbFunc, 256> Arm7TDMI::generate_thumb_table()
             if (Utils::get_bits(i, 3, 5) == 0b00)
                 table[i] = &thumb_unconditional_branch;
 
-            if (Utils::is_bit_set(i, 4))
+            else if (Utils::is_bit_set(i, 4))
                 table[i] = &thumb_long_branch_w_link;
     
             else 

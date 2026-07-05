@@ -2,13 +2,15 @@
 #include <bitset>
 
 #include "arm7.hpp"
+#include "memory.hpp"
+#include "tests.hpp"
 
 int main()
 {
-    Memory memory;
-    Arm7TDMI arm(memory);
+    FakeMemory memory;
+    Arm7TDMI cpu(memory);
 
-    arm.test();
-
+    // Passes thumb_mov_cmp_add_sub.json, thumb_add_sub.json, thumb_b.json, and thumb_bcc.json
+    GBATests::run_test(cpu, memory, "thumb_ldr_str_sp_rel.json");
     return 0;
 }

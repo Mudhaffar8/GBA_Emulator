@@ -1,2 +1,4 @@
 **/test_roms/
 *.exe
+**/v1/
+json.hpp

@@ -1,5 +1,8 @@
 #include "arm7.hpp"
 
+#include <cmath>
+
+// ADD Fully Tested
 uint32_t Arm7TDMI::alu_add_cmn(uint32_t op1, uint32_t op2, bool set_cc)
 {
     uint32_t result = op1 + op2;
@@ -7,8 +10,12 @@ uint32_t Arm7TDMI::alu_add_cmn(uint32_t op1, uint32_t op2, bool set_cc)
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, (op1 + op2) > std::numeric_limits<uint32_t>().max());
-        set_cpsr(ProgramStatusRegsiter::V, (op1 + op2) > std::numeric_limits<int>().max());
+        set_cpsr(ProgramStatusRegsiter::C, result < op1);
+
+        bool op1_msb_set = Utils::is_bit_set(op1, 31);
+        bool op2_msb_set = Utils::is_bit_set(op2, 31);
+        bool result_msb_set = Utils::is_bit_set(result, 31);
+        set_cpsr(ProgramStatusRegsiter::V, op1_msb_set == op2_msb_set && op1_msb_set != result_msb_set);
     }
 
     return result;
@@ -63,6 +70,7 @@ uint32_t Arm7TDMI::alu_eor_teq(uint32_t op1, uint32_t op2, bool set_cc)
     return result;
 } 
 
+// There may be an edge case w this instruction when negative
 uint32_t Arm7TDMI::alu_mov(uint32_t op2, bool set_cc) 
 { 
     if (set_cc)
@@ -127,14 +135,19 @@ uint32_t Arm7TDMI::alu_sbc(uint32_t op1, uint32_t op2, bool set_cc)
     return result;
 }
 
+// SUB fully Tested
 uint32_t Arm7TDMI::alu_sub_cmp(uint32_t op1, uint32_t op2, bool set_cc) 
 { 
     uint32_t result = op1 - op2;
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, op1 > op2);
-        set_cpsr(ProgramStatusRegsiter::V, (op1 - op2) < std::numeric_limits<int>().min());
+        set_cpsr(ProgramStatusRegsiter::C, op1 >= op2);
+
+        bool op1_msb_set = Utils::is_bit_set(op1, 31);
+        bool op2_msb_set = Utils::is_bit_set(op2, 31);
+        bool result_msb_set = Utils::is_bit_set(result, 31);
+        set_cpsr(ProgramStatusRegsiter::V, result_msb_set != op1_msb_set && op1_msb_set != op2_msb_set);
     }
     return result;
 }
