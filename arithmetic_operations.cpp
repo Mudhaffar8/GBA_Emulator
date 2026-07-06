@@ -155,14 +155,14 @@ uint32_t Arm7TDMI::alu_sub_cmp(uint32_t op1, uint32_t op2, bool set_cc)
 /* Shift Operations */
 uint32_t Arm7TDMI::alu_lsl(uint32_t op1, uint32_t op2, bool set_cc) // Logical Shift Left
 {
-    // LSR#0 = no shift applied,
+    // LSL#0 = no shift applied,
     // the C flag is NOT affected.
     uint32_t result = op1 << op2;
     if (set_cc)
     {
         set_negative_and_zero(result);
         if (op2 != 0) 
-            set_cpsr(ProgramStatusRegsiter::C, op1 > op2);
+            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 32 - op2));
     }
     return result;
 }
@@ -171,23 +171,32 @@ uint32_t Arm7TDMI::alu_lsr(uint32_t op1, uint32_t op2, bool set_cc) // Logical S
 {
     // LSR#0 is interpreted as LSR#32
     // Op2 becomes zero, C becomes Bit 31 of Rm.
-    uint32_t result = op1 >> (op2 == 0 ? 32 : op2);
+    uint32_t result = (op2 != 0) ? op1 >> op2 : 0;
+
     if (set_cc)
     {
         set_negative_and_zero(result);
+        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
     }
     return result;
+
+    // 1001
+    // 1011
 }
 
 uint32_t Arm7TDMI::alu_asr(uint32_t op1, uint32_t op2, bool set_cc)
 {
     // ASR#0 is interpreted as ASR#32
     // Op2 and C are filled by Bit 31 of Rm.
-    op2 = (op2 == 0) ? 32 : op2;
-    uint32_t result = op1 / (2 << op2);
+    bool msb_is_set = Utils::is_bit_set(op1, 31);
+    uint32_t result = (op2 != 0) ? (op1 >> op2) : 0;
+    result = (msb_is_set) ? 
+        (0xFFFFFFFF << (32 - op2)) | result : 
+        result;
     if (set_cc)
     {
         set_negative_and_zero(result);
+        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
     }
     return result;
 }

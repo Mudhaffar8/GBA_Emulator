@@ -344,11 +344,15 @@ void Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
     auto [dest_register, src_register] = thumb_get_dst_src(opcode);
 
     int operation = Utils::get_bits(opcode, 11, 13);
+    std::cout << "Operation: " << operation << '\n';
     uint32_t offset5 = Utils::get_bits(opcode, 6, 11);
+    std::cout << "Offset 5: " << offset5 << '\n';
 
     assert(operation != 0b11);
 
     dest_register = decode_shift_operation(src_register, offset5, operation);
+
+    std::cout << "Final Value: " << std::bitset<32>(dest_register) << '\n';
 }
 
 void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
@@ -357,25 +361,83 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1100);
 
-    uint32_t& base_register = thumb_get_dst(opcode);
+    int base_reg_index = Utils::get_bits(opcode, 8, 11);
+    std::cout << "Base Register Index: " << base_reg_index << '\n';
+    uint32_t& base_register = *registers[base_reg_index];
+    uint32_t address = base_register;
+    uint32_t address_to_write_base = address;
 
     uint32_t r_list = Utils::get_bits(opcode, 0, 8);
-    bool is_load = Utils::is_bit_set(opcode, 11);
+    std::cout << "R List: " << std::bitset<8>(r_list) << '\n';
 
+    bool is_load = Utils::is_bit_set(opcode, 11);
+    std::cout << "Is Load: " << is_load << '\n';
+
+    std::cout << "Start Address: " << address << '\n';
+    bool first_register = true;
+    bool base_is_first = true;
+
+    if (r_list == 0)
+    {
+        if (is_load)
+            pc = (memory.read32(base_register) + 4);
+        else
+            memory.write32(pc, base_register);
+
+        base_register += 64;
+        return;
+    }
+
+    /*
+        If <Rn> is specified in <registers>:
+        • If <Rn> is the lowest-numbered register specified in <registers>, the original value of 
+        <Rn> is stored.
+    */
     for (int i = 0; i < 8; ++i)
     {
-        int reg_index = (r_list >> i) & 1;
-        if (!reg_index) continue;
-
         if (is_load)
-            *registers[i] = memory.read32(base_register);
-        else 
-            memory.write32(*registers[i], base_register);
+        {
+            bool reg_index = Utils::is_bit_set(r_list, i);
+            if (!reg_index) continue;
+            *registers[i] = memory.read32(address);
+            std::cout << "Register " << i << ": " << *registers[i] << '\n'; 
+            address += 4;
+        }
+        else
+        {
+            bool reg_index = Utils::is_bit_set(r_list, i);
+            if (!reg_index) continue;
+            if (i == base_reg_index)
+            {
+                address_to_write_base = address;
+                base_is_first = first_register;
+            }
+            memory.write32(*registers[i], address);
+            address += 4;
 
-        base_register += 4;
+            first_register = false;
+        }
     }
+
+    bool reg_index = Utils::is_bit_set(r_list, base_reg_index);
+    if (!is_load && reg_index)
+    {
+        if (base_is_first)
+            memory.write32(base_register, address_to_write_base);
+        else 
+            memory.write32(address, address_to_write_base);
+    }
+
+    if (!reg_index || !is_load)
+        base_register = address; 
+
+    std::cout << "Final Address: " << address << '\n';
+
+    // Initial: 3543811841
+    // STMIA is scuffed af
 }
 
+// Passes all Tests
 void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
 {
     std::cout << "THUMB PC Relative Load\n";
@@ -387,10 +449,15 @@ void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
     // from the resulting address into Rd
     auto& dest_register = thumb_get_dst(opcode);
 
-    uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
+    std::cout << "PC Initial Value: " << pc << '\n';
 
-    pc += immediate10;
-    dest_register = memory.read32(pc);
+    uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
+    std::cout << "Immediate: " << immediate10 << '\n';
+
+    uint32_t new_address = (pc + immediate10 - 2) & ~3;
+    std::cout << "Final Value: " << new_address << '\n';
+
+    dest_register = memory.read32(new_address);
 }
 
 void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)

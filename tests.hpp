@@ -121,9 +121,10 @@ public:
                 uint32_t data = static_cast<uint32_t>(ram["data"]);
                 uint32_t addr = static_cast<uint32_t>(ram["addr"]);
                 
-                if (ram["size"] == 4) {
+                if (ram["size"] == 4) 
+                {
                     mem.write32(data, addr);
-                    std::cout << ", Initialized!\n";
+                    std::cout << "^ Initialized!\n";
                 }
             }
     
@@ -183,7 +184,7 @@ public:
                     check_val(mem.read32(addr), data, std::string("word @ ") + std::to_string(addr));
             }
 
-            //mem.clear_memory();
+            mem.clear_memory();
 
             std::cout << "\nPassed Test #" << number++ << '\n';
         }
