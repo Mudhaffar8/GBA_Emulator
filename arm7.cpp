@@ -43,7 +43,7 @@ bool Arm7TDMI::check_condition_code(uint32_t code)
     return false;
 }
 
-void Arm7TDMI::handle_mode_switch(CpuMode new_mode)
+void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 {
     Utils::set_bits(cpsr, new_mode, true);
 
@@ -51,6 +51,7 @@ void Arm7TDMI::handle_mode_switch(CpuMode new_mode)
     {
     case CpuMode::User:
     case CpuMode::System:
+        std::cout << "USER/SYSTEM\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -61,6 +62,7 @@ void Arm7TDMI::handle_mode_switch(CpuMode new_mode)
         break;
 
     case CpuMode::FastInterrupt:
+        std::cout << "FIQ\n";
         registers[8] = &r8_fiq;
         registers[9] = &r9_fiq;
         registers[10] = &r10_fiq;
@@ -72,24 +74,28 @@ void Arm7TDMI::handle_mode_switch(CpuMode new_mode)
         break;
 
     case CpuMode::InterruptRequest:
-        registers[13] = &r13_fiq;
+        std::cout << "IRQ\n";
+        registers[13] = &r13_irq;
         registers[14] = &r14_irq;
         spsr_irq = cpsr;
         break;
 
     case CpuMode::Supervisor:
+        std::cout << "SVC\n";
         registers[13] = &r13_svc;
         registers[14] = &r14_svc;
         spsr_svc = cpsr;
         break;
 
     case CpuMode::Abort:
+        std::cout << "ABT\n";
         registers[13] = &r13_abt;
         registers[14] = &r14_abt;
         spsr_abt = cpsr;
         break;
 
     case CpuMode::Undefined:
+        std::cout << "UND\n";
         registers[13] = &r13_und;
         registers[14] = &r14_und;
         spsr_und = cpsr;
@@ -128,8 +134,8 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
 
 void Arm7TDMI::thumb_execute(uint16_t opcode)
 {
-    (this->*thumb_instr_table[opcode >> 8])(opcode);
     pc += 2;
+    (this->*thumb_instr_table[opcode >> 8])(opcode);
 }
 
 /* Instruction Decoding */

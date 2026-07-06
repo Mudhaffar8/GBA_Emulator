@@ -111,8 +111,6 @@ private:
     }};
 
     uint32_t& pc = *registers[15];
-    uint32_t& sp = *registers[14];
-    uint32_t& link = *registers[13];
 
     // Program Status Registers
     uint32_t cpsr{};
@@ -122,6 +120,9 @@ private:
     CpuState state = CpuState::Arm;
 
 private:
+    inline uint32_t& get_sp() { return *registers[13]; }
+    inline uint32_t& get_link() { return *registers[14]; }
+
     /* Instruction Table Dispatch */
     std::array<ArmFunc, 4096> generate_arm_table();
     std::array<ThumbFunc, 256> generate_thumb_table();
@@ -129,7 +130,7 @@ private:
     void arm_execute(uint32_t opcode);
     void thumb_execute(uint16_t opcode);
 
-    void handle_mode_switch(CpuMode new_mode);
+    void handle_mode_switch(uint32_t new_mode);
     void handle_state_switch(CpuState new_state);
 
     bool check_condition_code(uint32_t code);
@@ -226,8 +227,23 @@ private:
     inline uint32_t& thumb_get_dst(uint16_t opcode) const
     {
         int dst_reg_index = Utils::get_bits(opcode, 8, 11);
+        std::cout << "Destination Idx: " << dst_reg_index << '\n';
         uint32_t& dest_register = *registers[dst_reg_index];
         return dest_register;
+    }
+
+    /* Stack Operations */
+    inline void thumb_stack_push(uint32_t val)
+    {
+        get_sp() -= 4;
+        memory.write32(val, get_sp());
+    }
+
+    inline uint32_t thumb_stack_pop()
+    {
+        uint32_t popped_value = memory.read32(get_sp());
+        get_sp() += 4;
+        return popped_value;
     }
 
     friend class GBATests;

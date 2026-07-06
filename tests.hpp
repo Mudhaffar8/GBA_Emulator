@@ -72,9 +72,21 @@ public:
         int number = 1;
         for (json::iterator it = data.begin(); it != data.end(); ++it)
         {
+            cpu.cpsr = static_cast<uint32_t>((*it)["initial"]["CPSR"]);
+            cpu.handle_mode_switch(cpu.cpsr & 0x1F);
+
             // Set CPU register values
-            for (int i = 0; i < 16; ++i)
+            for (int i = 0; i < 8; ++i)
                 *cpu.registers[i] = static_cast<uint32_t>((*it)["initial"]["R"][i]);
+
+            cpu.r8 = static_cast<uint32_t>((*it)["initial"]["R"][8]);
+            cpu.r9 = static_cast<uint32_t>((*it)["initial"]["R"][9]);
+            cpu.r10 = static_cast<uint32_t>((*it)["initial"]["R"][10]);
+            cpu.r11 = static_cast<uint32_t>((*it)["initial"]["R"][11]);
+            cpu.r12 = static_cast<uint32_t>((*it)["initial"]["R"][12]);
+            cpu.r13 = static_cast<uint32_t>((*it)["initial"]["R"][13]);
+            cpu.r14 = static_cast<uint32_t>((*it)["initial"]["R"][14]);
+            cpu.r15 = static_cast<uint32_t>((*it)["initial"]["R"][15]);
         
             cpu.r8_fiq = static_cast<uint32_t>((*it)["initial"]["R_fiq"][0]);
             cpu.r9_fiq = static_cast<uint32_t>((*it)["initial"]["R_fiq"][1]);
@@ -96,20 +108,41 @@ public:
             cpu.r13_und = static_cast<uint32_t>((*it)["initial"]["R_und"][0]);
             cpu.r14_und = static_cast<uint32_t>((*it)["initial"]["R_und"][1]);
 
-            cpu.cpsr = static_cast<uint32_t>((*it)["initial"]["CPSR"]);
             cpu.spsr_fiq = static_cast<uint32_t>((*it)["initial"]["SPSR"][0]);
             cpu.spsr_svc = static_cast<uint32_t>((*it)["initial"]["SPSR"][1]);
             cpu.spsr_abt = static_cast<uint32_t>((*it)["initial"]["SPSR"][2]);
             cpu.spsr_irq = static_cast<uint32_t>((*it)["initial"]["SPSR"][3]);
             cpu.spsr_und = static_cast<uint32_t>((*it)["initial"]["SPSR"][4]);
 
+            for (const auto& ram : ((*it)["transactions"]))
+            {
+                if (ram["kind"] != 1) continue;
+
+                uint32_t data = static_cast<uint32_t>(ram["data"]);
+                uint32_t addr = static_cast<uint32_t>(ram["addr"]);
+                
+                if (ram["size"] == 4) {
+                    mem.write32(data, addr);
+                    std::cout << ", Initialized!\n";
+                }
+            }
+    
             uint16_t opcode = static_cast<uint16_t>((*it)["opcode"]);
 
             cpu.thumb_execute(opcode);
 
             // Set CPU register values
-            for (int i = 0; i < 16; ++i)
-                check_val(*cpu.registers[i], static_cast<uint32_t>((*it)["final"]["R"][i]), "Register " + std::to_string(i));
+            for (int i = 0; i < 8; ++i)
+                check_val(*cpu.registers[i], static_cast<uint32_t>((*it)["final"]["R"][i]), "R" + std::to_string(i));
+
+            check_val(cpu.r8, static_cast<uint32_t>((*it)["final"]["R"][8]), "R8");
+            check_val(cpu.r9, static_cast<uint32_t>((*it)["final"]["R"][9]), "R9");
+            check_val(cpu.r10, static_cast<uint32_t>((*it)["final"]["R"][10]), "R10");
+            check_val(cpu.r11, static_cast<uint32_t>((*it)["final"]["R"][11]), "R11");
+            check_val(cpu.r12, static_cast<uint32_t>((*it)["final"]["R"][12]), "R12");
+            check_val(cpu.r13, static_cast<uint32_t>((*it)["final"]["R"][13]), "R13");
+            check_val(cpu.r14, static_cast<uint32_t>((*it)["final"]["R"][14]), "R14");
+            check_val(cpu.r15, static_cast<uint32_t>((*it)["final"]["R"][15]), "R15");
 
             check_val(cpu.r8_fiq, static_cast<uint32_t>((*it)["final"]["R_fiq"][0]), "R8 FIQ");
             check_val(cpu.r9_fiq, static_cast<uint32_t>((*it)["final"]["R_fiq"][1]), "R9 FIQ");
@@ -139,15 +172,20 @@ public:
             check_val(cpu.spsr_und, static_cast<uint32_t>((*it)["final"]["SPSR"][4]), "SPSR UND");
 
             // Compare RAM values
-            for (const auto& ram : ((*it)["final"]["transactions"]))
+            for (const auto& ram : ((*it)["transactions"]))
             {
+                if (ram["kind"] != 2) continue;
+
                 uint32_t data = static_cast<uint32_t>(ram["data"]);
                 uint32_t addr = static_cast<uint32_t>(ram["addr"]);
                 
-                check_val(mem.read32(addr), data, std::string("ram @ ") + std::string(1, addr));
+                if (ram["size"] == 4)
+                    check_val(mem.read32(addr), data, std::string("word @ ") + std::to_string(addr));
             }
 
-            std::cout << "Passed Test #" << number++ << '\n';
+            //mem.clear_memory();
+
+            std::cout << "\nPassed Test #" << number++ << '\n';
         }
 
         std::cout << "Passed Test: " << file_name << '\n';

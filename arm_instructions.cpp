@@ -7,7 +7,7 @@ void Arm7TDMI::arm_branch(uint32_t opcode)
     int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 2;
     
     if (Utils::is_bit_set(opcode, 24)) // Branch with Link
-        link = pc - 4;
+        *registers[13] = pc - 4;
 
     // The branch offset must take account of the prefetch operation, 
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
@@ -55,7 +55,7 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     /// @note The bottom 24 bits of the instruction are ignored by the processor
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    link = pc - 4;
+    *registers[14] = pc - 4;
     pc = Arm7VectorAddr::SWI;
 }
 
@@ -64,6 +64,6 @@ void Arm7TDMI::arm_undefined(uint32_t opcode)
 {
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    link = pc - 4;
+    *registers[14] = pc - 4;
     pc = Arm7VectorAddr::UNDEFINED;
 }

@@ -9,10 +9,15 @@ void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
     /// @note The condition codes are not set by this instruction.
     assert(Utils::get_bits(opcode, 8, 16) == 0b1011'0000);
 
-    bool is_sub = Utils::is_bit_set(opcode, 7);
+    std::cout << "SP Before: " << *registers[13] << '\n';
     uint32_t immediate9 = Utils::get_bits(opcode, 0, 7) << 2;
+    bool is_sub = Utils::is_bit_set(opcode, 7);
+    std::cout << "Immediate: " << immediate9 << '\n';
+    std::cout << "Is Sub: " << is_sub << '\n';
 
-    sp = (is_sub) ? sp - immediate9 : sp + immediate9;
+    get_sp() = (is_sub) ? 
+        get_sp() - immediate9 : 
+        get_sp() + immediate9;
 }
 
 // Passes All Tests
@@ -35,6 +40,7 @@ void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
         alu_add_cmn(src_register, operand2, true);
 }
 
+// Passes All Tests
 void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 {
     std::cout << "THUMB ALU Operations\n";
@@ -175,16 +181,16 @@ void Arm7TDMI::thumb_load_address(uint16_t opcode)
     bool is_stack_pointer = Utils::is_bit_set(opcode, 11);
     std::cout << "Is Stack Pointer: " << is_stack_pointer << '\n';
 
-    std::cout << "SP: " << sp << '\n';
+    std::cout << "SP: " << *registers[13] << '\n';
     std::cout << "PC: " << pc << '\n';
     if (is_stack_pointer) 
-        dest_register = (sp + immediate) - 2;
+        dest_register = (get_sp() + immediate);
     else
     {
         // Where the PC is used as the source register (SP = 0), bit 1 of the PC is always read
         // as 0. The value of the PC will be 4 bytes greater than the address of the instruction
         // before bit 1 is forced to 0.
-        dest_register = (pc + immediate) - 2; // Hack
+        dest_register = (pc + immediate) - 2;
     }
 }
 
@@ -196,18 +202,21 @@ void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 
     auto [dst_src_register, base_register] = thumb_get_dst_src(opcode);
     
-    uint32_t offset6 = Utils::get_bits(opcode, 6, 11);
-    bool is_load = Utils::is_bit_set(opcode, 11);
+    uint32_t offset6 = Utils::get_bits(opcode, 6, 11) << 1;
+    std::cout << "Offset: " << offset6 << '\n';
 
-    base_register += offset6;
+    bool is_load = Utils::is_bit_set(opcode, 11);
+    std::cout << "Is Load: " << is_load << '\n';
+
+    uint32_t total_offset = base_register + offset6;
 
     if (is_load)
     {
-        dst_src_register = memory.read16(base_register);
+        dst_src_register = memory.read16(total_offset);
         dst_src_register &= 0xFFFF;
     }
     else 
-        memory.write16(dst_src_register & 0xFFFF, base_register);
+        memory.write16(dst_src_register & 0xFFFF, total_offset);
 }
 
 void Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
@@ -290,11 +299,11 @@ void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
     if (is_offset_low)
     {
         uint32_t temp = pc - 2;
-        pc = link + (offset << 1);
-        link = temp | 1;
+        pc = *registers[13] + (offset << 1);
+        *registers[13] = temp | 1;
     }
     else
-        link = pc + (offset << 12);
+        *registers[13] = pc + (offset << 12);
 }
 
 // Passes All Tests
@@ -392,26 +401,74 @@ void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
     assert(Utils::get_bits(opcode, 9, 11) == 0b10);
 
     int r_list = Utils::get_bits(opcode, 0, 8);
+    std::cout << std::bitset<8>(r_list) << '\n';
     bool pc_lr_bit = Utils::is_bit_set(opcode, 8);
+    std::cout << "PC/LR: " << pc_lr_bit << '\n';
     bool is_pop = Utils::is_bit_set(opcode, 11);
+    std::cout << "Is POP: " << is_pop << '\n';
+
+    std::cout << "Init SP value: " << get_sp() << '\n';
+
+        
+    if (r_list == 0 && !pc_lr_bit)
+    {
+        if (is_pop)
+        {
+            // Why does this not get word-aligned?
+            pc = thumb_stack_pop() + 4;
+            get_sp() += 60;
+        }
+        else
+        {
+            get_sp() -= 60;
+            thumb_stack_push(pc);
+        }
+        
+        return;
+    }
+    
+    if (pc_lr_bit && !is_pop)
+        thumb_stack_push(get_link());
 
     for (int i = 0; i < 8; ++i)
     {
-        int reg_index = (r_list >> i) & 1;
-        if (!reg_index) continue;
-
         if (is_pop)
         {
-            *registers[i] = memory.read32(sp);
-            sp += 4;
+            bool reg_index = Utils::is_bit_set(r_list, i);
+            if (!reg_index) continue;
+            *registers[i] = thumb_stack_pop();
         }
         else
-        { 
-            memory.write32(*registers[i], sp);
-            sp -= 4;
+        {
+            bool reg_index = Utils::is_bit_set(r_list, 7 - i);
+            if (!reg_index) continue;
+            thumb_stack_push(*registers[7 - i]);
         }
     }
+
+    if (pc_lr_bit && is_pop)
+        pc = (thumb_stack_pop() & ~1) + 4;
 }
+
+/*
+Final:
+    4219587359, // Stays the same
+    523393412, // changes
+    1698507741, // stays same
+    2080068945,
+    731542932,
+    3881155646,
+    2132602419,
+    3244240801,
+    2341217335,
+    2857604858,
+    1205345846,
+    105923297,
+    2502113562,
+    2349263592,
+    3653915678,
+    3895845124
+*/
 
 void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 {
@@ -422,7 +479,7 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
     /// @note Value8 is used solely by the SWI handler: it is ignored by the processor
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    link = pc - 2;
+    *registers[14] = pc - 2;
     pc = Arm7VectorAddr::SWI;
 }
 
@@ -441,13 +498,13 @@ void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
     bool is_load = Utils::is_bit_set(opcode, 11);
     std::cout << "Is Load: " << is_load << '\n';
 
-    sp += unsigned_offset10;
-    std::cout << "SP + Offset: " << sp << '\n';
+    *registers[13] += unsigned_offset10;
+    std::cout << "SP + Offset: " << *registers[13] << '\n';
     
     if (is_load)
-        dest_register = memory.read32(sp);
+        dest_register = memory.read32(*registers[13]);
     else 
-        memory.write32(dest_register, sp);
+        memory.write32(dest_register, *registers[13]);
 }
 
 // Passes All Tests BUT may still be buggy
@@ -469,6 +526,6 @@ void Arm7TDMI::thumb_undefined(uint16_t opcode)
 
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    link = pc - 2;
+    *registers[14] = pc - 2;
     pc = Arm7VectorAddr::UNDEFINED;
 }

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -47,26 +48,27 @@ public:
     uint8_t read8(uint32_t address) 
     { 
         auto it = memory.find(address);
-
+        
         if (it != memory.end())
             return it->second;
-            
+        
         return 0; 
     }
 
-    void write8(uint8_t half_word, uint32_t address) 
+    void write8(uint8_t byte, uint32_t address) 
     {
-        memory.insert_or_assign(half_word, address);
+        memory.insert_or_assign(address, byte);
     }
 
     void write16(uint16_t half_word, uint32_t address)
     {
         write8(half_word & 0xFF, address);
-        write8(half_word >> 8, address + 1);
+        write8((half_word >> 8) & 0xFF, address + 1);
     }
 
     void write32(uint32_t word, uint32_t address)
     {
+        std::cout << "Wrote word " << word << " @ " << address << '\n';
         write8(word & 0xFF, address);
         write8((word >> 8) & 0xFF, address + 1);
         write8((word >> 16) & 0xFF, address + 2);
@@ -84,6 +86,14 @@ public:
             (read8(address + 1) << 8) | 
             (read8(address + 2) << 16) | 
             (read8(address + 3) << 24); 
+    }
+
+    void clear_memory() { memory.clear(); }
+
+    void print_memory()
+    {
+        for (auto& [key, value] : memory)
+            std::cout << "[" << key << "]: " << +value << '\n';
     }
 
 private:
