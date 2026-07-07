@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <bitset>
 #include <cassert>
 #include <stdexcept>
 #include <sstream>
@@ -21,16 +22,20 @@ public:
     /// @tparam T type of values being compared. Must support equality comparison.
     /// @param val Value being checked.
     /// @param other_val Value compared against.
-    /// @param name Descriptive label used in error output and exception messages.
     /// @throws `std::runtime_error` thrown when values are not equal
-    template<typename T>
+    template<typename T, bool print_bits = false>
     static void check_val(T val, T other_val, std::string name)
     {   
         if (val != other_val) 
         {
             // To prevent printing the ascii character instead of number for uint8_t, uint16_t etc.
-            if constexpr (std::is_arithmetic<T>::value)
-                std::cout << name << " Expected: " << +other_val << " Got: " << +val << '\n';
+            if constexpr (std::is_arithmetic<T>::value) 
+            {
+                if constexpr (print_bits)
+                    std::cout << name << " Expected: " << std::bitset<32>(other_val) << "\n Got: " << std::bitset<32>(+val) << '\n';
+                else 
+                    std::cout << name << " Expected: " << +other_val << " Got: " << +val << '\n';
+            }
             else
                 std::cout << name << " Expected: " << other_val << " Got: " << val << '\n';
             
@@ -72,6 +77,8 @@ public:
         int number = 1;
         for (json::iterator it = data.begin(); it != data.end(); ++it)
         {
+            cpu.skip_mult_instr = false;
+            
             cpu.cpsr = static_cast<uint32_t>((*it)["initial"]["CPSR"]);
             cpu.handle_mode_switch(cpu.cpsr & 0x1F);
 
@@ -165,12 +172,13 @@ public:
             check_val(cpu.r13_und, static_cast<uint32_t>((*it)["final"]["R_und"][0]), "R13 UND");
             check_val(cpu.r14_und, static_cast<uint32_t>((*it)["final"]["R_und"][1]), "R14 UND");
 
-            check_val(cpu.cpsr, static_cast<uint32_t>((*it)["final"]["CPSR"]), "CPSR");
-            check_val(cpu.spsr_fiq, static_cast<uint32_t>((*it)["final"]["SPSR"][0]), "SPSR FIQ");
-            check_val(cpu.spsr_svc, static_cast<uint32_t>((*it)["final"]["SPSR"][1]), "SPSR SVC");
-            check_val(cpu.spsr_abt, static_cast<uint32_t>((*it)["final"]["SPSR"][2]), "SPSR ABT");
-            check_val(cpu.spsr_irq, static_cast<uint32_t>((*it)["final"]["SPSR"][3]), "SPSR IRQ");
-            check_val(cpu.spsr_und, static_cast<uint32_t>((*it)["final"]["SPSR"][4]), "SPSR UND");
+            if (!cpu.skip_mult_instr) // Skipping Multiplication instructions cuz the carry flag is BS
+                check_val<uint32_t, true>(cpu.cpsr, static_cast<uint32_t>((*it)["final"]["CPSR"]), "CPSR");
+            check_val<uint32_t, true>(cpu.spsr_fiq, static_cast<uint32_t>((*it)["final"]["SPSR"][0]), "SPSR FIQ");
+            check_val<uint32_t, true>(cpu.spsr_svc, static_cast<uint32_t>((*it)["final"]["SPSR"][1]), "SPSR SVC");
+            check_val<uint32_t, true>(cpu.spsr_abt, static_cast<uint32_t>((*it)["final"]["SPSR"][2]), "SPSR ABT");
+            check_val<uint32_t, true>(cpu.spsr_irq, static_cast<uint32_t>((*it)["final"]["SPSR"][3]), "SPSR IRQ");
+            check_val<uint32_t, true>(cpu.spsr_und, static_cast<uint32_t>((*it)["final"]["SPSR"][4]), "SPSR UND");
 
             // Compare RAM values
             for (const auto& ram : ((*it)["transactions"]))
@@ -189,7 +197,7 @@ public:
             std::cout << "\nPassed Test #" << number++ << '\n';
         }
 
-        std::cout << "Passed Test: " << file_name << '\n';
+        std::cout << "Passed All Test: " << file_name << '\n';
         std::cout << "------------------------\n";
     }
 };

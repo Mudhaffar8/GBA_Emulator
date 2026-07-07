@@ -28,8 +28,12 @@ uint32_t Arm7TDMI::alu_adc(uint32_t op1, uint32_t op2, bool set_cc)
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, (op1 + op2 + c_set()) > std::numeric_limits<uint32_t>().max());
-        set_cpsr(ProgramStatusRegsiter::V, (op1 + op2 + c_set()) > std::numeric_limits<int>().max());
+        set_cpsr(ProgramStatusRegsiter::C, result < op1);
+
+        bool op1_msb_set = Utils::is_bit_set(op1, 31);
+        bool op2_msb_set = Utils::is_bit_set(op2, 31);
+        bool result_msb_set = Utils::is_bit_set(result, 31);
+        set_cpsr(ProgramStatusRegsiter::V, op1_msb_set == op2_msb_set && op1_msb_set != result_msb_set);
     }
 
     return result;
@@ -129,8 +133,12 @@ uint32_t Arm7TDMI::alu_sbc(uint32_t op1, uint32_t op2, bool set_cc)
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, op1 - !c_set() > op2);
-        set_cpsr(ProgramStatusRegsiter::V, (op1 - op2 - !c_set()) < std::numeric_limits<int>().min());
+        set_cpsr(ProgramStatusRegsiter::C, op1 >= op2 + !c_set());
+
+        bool op1_msb_set = Utils::is_bit_set(op1, 31);
+        bool op2_msb_set = Utils::is_bit_set(op2, 31);
+        bool result_msb_set = Utils::is_bit_set(result, 31);
+        set_cpsr(ProgramStatusRegsiter::V, result_msb_set != op1_msb_set && op1_msb_set != op2_msb_set);
     }
     return result;
 }
@@ -176,7 +184,10 @@ uint32_t Arm7TDMI::alu_lsr(uint32_t op1, uint32_t op2, bool set_cc) // Logical S
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
+        if (op2 != 0) 
+            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
+        else   
+            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 31)); 
     }
     return result;
 
@@ -203,19 +214,41 @@ uint32_t Arm7TDMI::alu_asr(uint32_t op1, uint32_t op2, bool set_cc)
 
 uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc)
 {
-    // ROR#0 interpreted as RRX#1 (RCR), 
-    // like ROR#1, but Op1 Bit 31 set to old C.
+    /* 
+        if Rs[7:0] == 0 then
+            C Flag = unaffected
+            Rd = unaffected
+        else if Rs[4:0] == 0 then
+            C Flag = Rd[31]
+            Rd = unaffected
+        else // Rs[4:0] > 0
+            C Flag = Rd[Rs[4:0] - 1]
+            Rd = Rd Rotate_Right Rs[4:0]
+        N Flag = Rd[31]
+        Z Flag = if Rd == 0 then 1 else 0
+        V Flag = unaffected
+    */
     uint32_t result = op1;
-    if (op2 == 0)
-    {
-        result >>= 1;
-        result |= (c_set() << 31);
-    }
+    if (Utils::get_bits(op2, 0, 8) == 0 && Utils::get_bits(op2, 0, 5) == 0)
+    {}
     else
     {
-        uint32_t bits_shifted_out = Utils::get_bits(result, 0, op2 + 1);
-        result >>= op2;
-        result |= (bits_shifted_out << (32 - op2)); // Check the math here
+        std::cout << "Old Val: " << std::bitset<32>(op1) << '\n';
+
+        uint8_t rotate_amount = Utils::get_bits(op2, 0, 5);
+        std::cout << "Rotate Amount: " << +rotate_amount << '\n';
+        
+        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, rotate_amount - 1));
+
+        uint32_t bits_shifted_out = Utils::get_bits(op1, 0, rotate_amount);
+        std::cout << "Bits Shifted Out: " << std::bitset<32>(bits_shifted_out) << '\n';
+
+        result >>= rotate_amount;
+        std::cout << "Bit Shifted Val: " << result << '\n';
+
+        result |= (bits_shifted_out << (32 - rotate_amount)); 
+
+        std::cout << "New Val: " << std::bitset<32>(result) << '\n';
     }
     if (set_cc)
         set_negative_and_zero(result);
@@ -239,8 +272,22 @@ uint32_t Arm7TDMI::decode_shift_operation(uint32_t op1, uint32_t op2, int shift_
 
 uint32_t Arm7TDMI::alu_mul(uint32_t op1, uint32_t op2, bool set_cc)
 {
+    /*
+        The MUL instruction is defined to leave the C flag unchanged in ARMv5 and above. 
+        In earlier versions of the architecture, the value of the C flag was UNPREDICTABLE 
+        after a MUL instruction.
+        
+        I have no clue what NBA does with the carry flag
+    */
+    skip_mult_instr = true;
     uint32_t result = op1 * op2;
+    std::cout << "Mult Result: " << result << '\n';
     if (set_cc)
+    {
         set_negative_and_zero(result);
+
+        uint64_t mult = op1 * op2;
+        set_cpsr(ProgramStatusRegsiter::C, mult > std::numeric_limits<uint32_t>().max());
+    }
     return result;
 }

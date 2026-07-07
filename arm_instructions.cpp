@@ -12,6 +12,7 @@ void Arm7TDMI::arm_branch(uint32_t opcode)
     // The branch offset must take account of the prefetch operation, 
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
     pc += sign_extended_offset;
+    is_branched = true;
 }
 
 // 2S + 1N Cycles
@@ -53,17 +54,23 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
 {
     /// @note The bottom 24 bits of the instruction are ignored by the processor
+    old_cpsr = cpsr;
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    *registers[14] = pc - 4;
-    pc = Arm7VectorAddr::SWI;
+    set_cpsr(ProgramStatusRegsiter::I, true);
+    get_link() = pc - 2;
+    pc = Arm7VectorAddr::SWI + 8;
+    is_branched = true;
 }
 
 // 2S + 1I + 1N cycles
 void Arm7TDMI::arm_undefined(uint32_t opcode)
 {
+    old_cpsr = cpsr;
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    *registers[14] = pc - 4;
-    pc = Arm7VectorAddr::UNDEFINED;
+    set_cpsr(ProgramStatusRegsiter::I, true);
+    get_link() = pc - 2;
+    pc = Arm7VectorAddr::SWI + 8;
+    is_branched = true;
 }

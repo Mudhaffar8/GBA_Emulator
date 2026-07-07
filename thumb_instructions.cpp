@@ -3,6 +3,7 @@
 #include <cassert>
 #include <iostream>
 
+// Passes all Tests
 void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 {
     std::cout << "THUMB Add Offset SP\n";
@@ -40,7 +41,6 @@ void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
         alu_add_cmn(src_register, operand2, true);
 }
 
-// Passes All Tests
 void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 {
     std::cout << "THUMB ALU Operations\n";
@@ -49,8 +49,8 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 
     auto [dest_register, src_register] = thumb_get_dst_src(opcode);
 
-    int operation = Utils::get_bits(opcode, 6, 10);
-    bool set_condition_codes = Utils::is_bit_set(opcode, 20);
+    int operation = Utils::get_bits(opcode, 6, 10);    
+    std::cout << "Operations: " << operation << '\n';
 
     switch (operation)
     {
@@ -61,13 +61,70 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         dest_register = alu_eor_teq(dest_register, src_register, true);
         break;
     case 0b0010: // LSL Rd, Rs
-        dest_register = alu_lsl(dest_register, src_register, true);
+        {
+            uint32_t first_8_bits = Utils::get_bits(src_register, 0, 8);
+            bool msb_is_set = Utils::is_bit_set(dest_register, 31);
+            std::cout << "First 8 bits: " << first_8_bits << '\n';
+
+            if (first_8_bits < 32)
+                dest_register = alu_lsl(dest_register, first_8_bits, true);
+            else if (first_8_bits == 32)
+            {
+                set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(dest_register, 0));
+                dest_register = 0;
+                set_negative_and_zero(dest_register);
+            }
+            else
+            {
+                dest_register = 0;
+
+                set_negative_and_zero(dest_register);
+                set_cpsr(ProgramStatusRegsiter::C, false);
+            }
+        }
         break;
     case 0b0011: // LSR Rd, Rs
-        dest_register = alu_lsr(dest_register, src_register, true);
+        {
+            uint32_t first_8_bits = Utils::get_bits(src_register, 0, 8);
+            bool msb_is_set = Utils::is_bit_set(dest_register, 31);
+            std::cout << "First 8 Bits: " << first_8_bits << '\n';
+
+            if (first_8_bits == 0)
+                set_negative_and_zero(dest_register);
+            else if (first_8_bits < 32)
+                dest_register = alu_lsr(dest_register, first_8_bits, true);
+            else if (first_8_bits == 32)
+            {
+                dest_register = 0;
+                set_negative_and_zero(dest_register);
+                set_cpsr(ProgramStatusRegsiter::C, msb_is_set);
+            }
+            else
+            {
+                dest_register = 0;
+
+                set_negative_and_zero(dest_register);
+                set_cpsr(ProgramStatusRegsiter::C, false);
+            }
+        }
         break;
     case 0b0100: // ASR Rd, Rs
-        dest_register = alu_asr(dest_register, src_register, true);
+        {
+            uint32_t first_8_bits = Utils::get_bits(src_register, 0, 8);
+
+            if (first_8_bits == 0)
+                set_negative_and_zero(dest_register);
+            else if (first_8_bits < 32) 
+                dest_register = alu_asr(dest_register, src_register, true);
+            else if (first_8_bits >= 32)
+            {
+                bool msb_is_set = Utils::is_bit_set(dest_register, 31);
+                dest_register = (msb_is_set) ? 0xFFFFFFFF : 0;
+
+                set_negative_and_zero(dest_register);
+                set_cpsr(ProgramStatusRegsiter::C, msb_is_set);
+            }
+        }
         break;
     case 0b0101: // ADC Rd, Rs -> Rd + Rs + Carry
         dest_register = alu_adc(dest_register, src_register, true);
@@ -82,7 +139,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         alu_and_tst(dest_register, src_register, true);
         break;
     case 0b1001: // NEG Rd, Rs
-        dest_register = alu_mov(-src_register, true);
+        dest_register = alu_sub_cmp(0, src_register, true);
         break;
     case 0b1010: // CMP Rd, Rs -> Set condition codes on Rd - Rs
         alu_sub_cmp(dest_register, src_register, true);
@@ -100,7 +157,8 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         dest_register = alu_bic(dest_register, src_register, true);
         break;
     case 0b1111: // MVN Rd, Rs -> NOT Rs
-        dest_register = alu_mvn(dest_register, true);
+        dest_register = ~src_register;
+        set_negative_and_zero(dest_register);
         break;
     default:
         throw std::runtime_error("ERROR (THUMB HI REG Operation): " + operation);
@@ -108,6 +166,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
     }
 }
 
+// Passes All Tests
 void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
 {
     std::cout << "THUMB Conditional Branch\n";
@@ -118,7 +177,10 @@ void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
     int32_t signed_offset9 = Utils::sign_extend32(opcode, 0, 7) << 1;
 
     if (check_condition_code(cond))
-        pc += signed_offset9 + 2; // This may also cause bugs.
+    {
+        pc += signed_offset9 + 4; 
+        is_branched = true;
+    }
 }
 
 void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
@@ -137,13 +199,13 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
     int operation = Utils::get_bits(opcode, 8, 10);
     std::cout << "Operation: " << operation << '\n';
 
-    int src_reg_index = Utils::get_bits(opcode, 3, 6);
-    int dst_reg_index = Utils::get_bits(opcode, 0, 3);
+    int src_reg_index = Utils::get_bits(opcode, 3, 6) + (8 * hi_flag_2);
+    int dst_reg_index = Utils::get_bits(opcode, 0, 3) + (8 * hi_flag_1);
 
-    uint32_t& dest_register = *registers[dst_reg_index + (8 * hi_flag_1)];
-    uint32_t src_register = *registers[src_reg_index + (8 * hi_flag_2)];
-    std::cout << "Dst Reg Index: " << dst_reg_index + (8 * hi_flag_1) << '\n';
-    std::cout << "Src Reg Index: " << hi_flag_2 << '\n';
+    uint32_t& dest_register = *registers[dst_reg_index];
+    uint32_t src_register = *registers[src_reg_index];
+    std::cout << "Dst Reg Index: " << dst_reg_index << '\n';
+    std::cout << "Src Reg Index: " << src_reg_index << '\n';
 
     // In this group only CMP (Op = 01) sets the CPSR condition codes.
     switch(operation)
@@ -164,6 +226,8 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
         throw std::runtime_error("ERROR (THUMB HI REG Operation): " + operation);
         break;
     }
+
+    std::cout << "Final Value: " << dest_register << '\n';
 }
 
 
@@ -380,9 +444,9 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
     if (r_list == 0)
     {
         if (is_load)
-            pc = (memory.read32(base_register) + 4);
+            pc = (memory.read32(base_register) + 2);
         else
-            memory.write32(pc, base_register);
+            memory.write32(pc + 2, base_register);
 
         base_register += 64;
         return;
@@ -454,7 +518,7 @@ void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
     uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
     std::cout << "Immediate: " << immediate10 << '\n';
 
-    uint32_t new_address = (pc + immediate10 - 2) & ~3;
+    uint32_t new_address = (pc + immediate10) & ~3;
     std::cout << "Final Value: " << new_address << '\n';
 
     dest_register = memory.read32(new_address);
@@ -483,12 +547,13 @@ void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
         {
             // Why does this not get word-aligned?
             pc = thumb_stack_pop() + 4;
+            is_branched = true;
             get_sp() += 60;
         }
         else
         {
             get_sp() -= 60;
-            thumb_stack_push(pc);
+            thumb_stack_push(pc + 2);
         }
         
         return;
@@ -513,8 +578,11 @@ void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
         }
     }
 
-    if (pc_lr_bit && is_pop)
+    if (pc_lr_bit && is_pop) 
+    {
         pc = (thumb_stack_pop() & ~1) + 4;
+        is_branched = true;
+    }
 }
 
 /*
@@ -544,10 +612,13 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
     assert(Utils::get_bits(opcode, 8, 16) == 0b1101'1111);
 
     /// @note Value8 is used solely by the SWI handler: it is ignored by the processor
+    old_cpsr = cpsr;
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    *registers[14] = pc - 2;
-    pc = Arm7VectorAddr::SWI;
+    set_cpsr(ProgramStatusRegsiter::I, true);
+    get_link() = pc - 2;
+    pc = Arm7VectorAddr::SWI + 8;
+    is_branched = true;
 }
 
 void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
@@ -574,7 +645,7 @@ void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
         memory.write32(dest_register, *registers[13]);
 }
 
-// Passes All Tests BUT may still be buggy
+// Passes All Tests
 void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
 {
     std::cout << "THUMB Unconditional Branch\n";
@@ -583,16 +654,19 @@ void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
     
     int32_t signed_extend12 = Utils::sign_extend32(opcode, 0, 10) << 1;
 
-    pc += signed_extend12;
-    pc += 2; // This part may cause some problems
+    pc += signed_extend12 + 4;
+    is_branched = true;
 }
 
 void Arm7TDMI::thumb_undefined(uint16_t opcode)
 {
     std::cout << "THUMB Undefined\n";
 
+    old_cpsr = cpsr;
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
-    *registers[14] = pc - 2;
-    pc = Arm7VectorAddr::UNDEFINED;
+    set_cpsr(ProgramStatusRegsiter::I, true);
+    get_link() = pc - 2;
+    pc = Arm7VectorAddr::UNDEFINED + 8;
+    is_branched = true;
 }

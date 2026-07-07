@@ -81,7 +81,7 @@ private:
         I = (1 << 7), // IRQ Disable
         F = (1 << 6), // FIQ Disable
 
-        T = (1 << 7), // State bit
+        T = (1 << 5), // State bit
         Mode = 0x1F  // Mode bit
     };
 
@@ -89,10 +89,10 @@ private:
     using ArmFunc = void (Arm7TDMI::*)(uint32_t opcode);
     using ThumbFunc = void (Arm7TDMI::*)(uint16_t opcode);
 
+    FakeMemory& memory;
+
     std::array<ArmFunc, 4096> arm_instr_table = generate_arm_table();
     std::array<ThumbFunc, 256> thumb_instr_table = generate_thumb_table();
-
-    FakeMemory& memory;
 
     /* Registers */
     // General Purpose Registers
@@ -113,12 +113,14 @@ private:
     uint32_t& pc = *registers[15];
 
     // Program Status Registers
-    uint32_t cpsr{};
+    uint32_t cpsr{}, old_cpsr{};
     uint32_t spsr_fiq{}, spsr_svc{}, spsr_abt{}, spsr_irq{}, spsr_und{};
 
     CpuMode mode = CpuMode::User;
     CpuState state = CpuState::Arm;
 
+    bool is_branched = false;
+    bool skip_mult_instr = false; // Skipping mult instructions on SST
 private:
     inline uint32_t& get_sp() { return *registers[13]; }
     inline uint32_t& get_link() { return *registers[14]; }

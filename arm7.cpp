@@ -45,7 +45,10 @@ bool Arm7TDMI::check_condition_code(uint32_t code)
 
 void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 {
-    Utils::set_bits(cpsr, new_mode, true);
+    cpsr &= ~ProgramStatusRegsiter::Mode;
+    cpsr |= new_mode;
+
+    std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
 
     switch(new_mode)
     {
@@ -70,35 +73,34 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         registers[12] = &r12_fiq;
         registers[13] = &r13_fiq;
         registers[14] = &r14_fiq;
-        spsr_fiq = cpsr;
         break;
 
     case CpuMode::InterruptRequest:
         std::cout << "IRQ\n";
         registers[13] = &r13_irq;
         registers[14] = &r14_irq;
-        spsr_irq = cpsr;
+        spsr_irq = old_cpsr; 
         break;
 
     case CpuMode::Supervisor:
         std::cout << "SVC\n";
         registers[13] = &r13_svc;
         registers[14] = &r14_svc;
-        spsr_svc = cpsr;
+        spsr_svc = old_cpsr; 
         break;
 
     case CpuMode::Abort:
         std::cout << "ABT\n";
         registers[13] = &r13_abt;
         registers[14] = &r14_abt;
-        spsr_abt = cpsr;
+        spsr_abt = old_cpsr; 
         break;
 
     case CpuMode::Undefined:
         std::cout << "UND\n";
         registers[13] = &r13_und;
         registers[14] = &r14_und;
-        spsr_und = cpsr;
+        spsr_und = old_cpsr; 
         break;
 
     default:
@@ -110,20 +112,24 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 void Arm7TDMI::handle_state_switch(CpuState new_state)
 {
     state = new_state;
-    cpsr &= ~new_state;
+
+    cpsr &= ~ProgramStatusRegsiter::T;
     cpsr |= new_state;
 }
 
 void Arm7TDMI::branch_and_exchange(uint32_t address)
 {
+    std::cout << "New Branch Address: " << address << '\n';
+    std::cout << "Thumb Mode: " << (address & 1) << '\n';
     if (address & 1)
     {
-        pc = address & ~1;
+        std::cout << "Switching to THUMB!\n";
+        pc = (address & ~1) + 4;
         handle_state_switch(CpuState::Thumb);
     }
     else
     {
-        pc = address & ~3;
+        pc = address + 8;
         handle_state_switch(CpuState::Arm);
     }
 }
@@ -134,8 +140,10 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
 
 void Arm7TDMI::thumb_execute(uint16_t opcode)
 {
-    pc += 2;
+    is_branched = false;
     (this->*thumb_instr_table[opcode >> 8])(opcode);
+    if (!is_branched)
+        pc += 2;
 }
 
 /* Instruction Decoding */
