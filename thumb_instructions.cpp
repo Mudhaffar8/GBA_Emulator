@@ -6,15 +6,15 @@
 // Passes all Tests
 void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 {
-    std::cout << "THUMB Add Offset SP\n";
+    // std::cout << "THUMB Add Offset SP\n";
     /// @note The condition codes are not set by this instruction.
     assert(Utils::get_bits(opcode, 8, 16) == 0b1011'0000);
 
-    std::cout << "SP Before: " << *registers[13] << '\n';
+    // std::cout << "SP Before: " << *registers[13] << '\n';
     uint32_t immediate9 = Utils::get_bits(opcode, 0, 7) << 2;
     bool is_sub = Utils::is_bit_set(opcode, 7);
-    std::cout << "Immediate: " << immediate9 << '\n';
-    std::cout << "Is Sub: " << is_sub << '\n';
+    // std::cout << "Immediate: " << immediate9 << '\n';
+    // std::cout << "Is Sub: " << is_sub << '\n';
 
     get_sp() = (is_sub) ? 
         get_sp() - immediate9 : 
@@ -24,7 +24,7 @@ void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
 {    
-    std::cout << "THUMB Add Subtract\n";
+    // std::cout << "THUMB Add Subtract\n";
 
     assert(Utils::get_bits(opcode, 11, 16) == 0b00011);
 
@@ -43,14 +43,14 @@ void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
 
 void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 {
-    std::cout << "THUMB ALU Operations\n";
+    // std::cout << "THUMB ALU Operations\n";
 
     assert(Utils::get_bits(opcode, 10, 16) == 0b010000);
 
     auto [dest_register, src_register] = thumb_get_dst_src(opcode);
 
     int operation = Utils::get_bits(opcode, 6, 10);    
-    std::cout << "Operations: " << operation << '\n';
+    // std::cout << "Operations: " << operation << '\n';
 
     switch (operation)
     {
@@ -64,7 +64,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         {
             uint32_t first_8_bits = Utils::get_bits(src_register, 0, 8);
             bool msb_is_set = Utils::is_bit_set(dest_register, 31);
-            std::cout << "First 8 bits: " << first_8_bits << '\n';
+            // std::cout << "First 8 bits: " << first_8_bits << '\n';
 
             if (first_8_bits < 32)
                 dest_register = alu_lsl(dest_register, first_8_bits, true);
@@ -87,7 +87,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         {
             uint32_t first_8_bits = Utils::get_bits(src_register, 0, 8);
             bool msb_is_set = Utils::is_bit_set(dest_register, 31);
-            std::cout << "First 8 Bits: " << first_8_bits << '\n';
+            // std::cout << "First 8 Bits: " << first_8_bits << '\n';
 
             if (first_8_bits == 0)
                 set_negative_and_zero(dest_register);
@@ -169,7 +169,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
 {
-    std::cout << "THUMB Conditional Branch\n";
+    // std::cout << "THUMB Conditional Branch\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1101);
 
@@ -185,7 +185,7 @@ void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
 
 void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
 {
-    std::cout << "THUMB HI Reg Operations/Branch Exchange\n";
+    // std::cout << "THUMB HI Reg Operations/Branch Exchange\n";
 
     assert(Utils::get_bits(opcode, 10, 16) == 0b010'001);
 
@@ -193,21 +193,21 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
     // undefined, and should not be used.
     bool hi_flag_2 = Utils::is_bit_set(opcode, 6);
     bool hi_flag_1 = Utils::is_bit_set(opcode, 7);
-    std::cout << "Hi Flag 1: " << hi_flag_1 << '\n';
-    std::cout << "Hi Flag 2: " << hi_flag_2 << '\n';
+    // std::cout << "Hi Flag 1: " << hi_flag_1 << '\n';
+    // std::cout << "Hi Flag 2: " << hi_flag_2 << '\n';
 
     int operation = Utils::get_bits(opcode, 8, 10);
-    std::cout << "Operation: " << operation << '\n';
+    // std::cout << "Operation: " << operation << '\n';
 
     int src_reg_index = Utils::get_bits(opcode, 3, 6) + (8 * hi_flag_2);
     int dst_reg_index = Utils::get_bits(opcode, 0, 3) + (8 * hi_flag_1);
 
     uint32_t& dest_register = *registers[dst_reg_index];
     uint32_t src_register = *registers[src_reg_index];
-    std::cout << "Dst Reg Index: " << dst_reg_index << '\n';
-    std::cout << "Src Reg Index: " << src_reg_index << '\n';
-    std::cout << "Dst Reg: " << dest_register << '\n';
-    std::cout << "Src Reg: " << src_register << '\n';
+    // std::cout << "Dst Reg Index: " << dst_reg_index << '\n';
+    // std::cout << "Src Reg Index: " << src_reg_index << '\n';
+    // std::cout << "Dst Reg: " << dest_register << '\n';
+    // std::cout << "Src Reg: " << src_register << '\n';
     
     // In this group only CMP (Op = 01) sets the CPSR condition codes.
     switch(operation)
@@ -229,56 +229,58 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
         break;
     }
 
-    std::cout << "Final Value: " << dest_register << '\n';
+    // std::cout << "Final Value: " << dest_register << '\n';
 }
 
 
 void Arm7TDMI::thumb_load_address(uint16_t opcode)
 {
-    std::cout << "THUMB Load Address\n";
+    // std::cout << "THUMB Load Address\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1010);
 
     // The CPSR condition codes are unaffected by these instructions.
     auto& dest_register = thumb_get_dst(opcode);
-    std::cout << "Destination Reg: " << dest_register << '\n';
-    uint32_t immediate = Utils::get_bits(opcode, 0, 8) << 2;
-    std::cout << "Immediate: " << immediate << '\n';
-    bool is_stack_pointer = Utils::is_bit_set(opcode, 11);
-    std::cout << "Is Stack Pointer: " << is_stack_pointer << '\n';
+    // std::cout << "Destination Reg: " << dest_register << '\n';
 
-    std::cout << "SP: " << *registers[13] << '\n';
-    std::cout << "PC: " << pc << '\n';
-    if (is_stack_pointer) 
-        dest_register = (get_sp() + immediate);
+    uint32_t immediate = Utils::get_bits(opcode, 0, 8) << 2;
+    // std::cout << "Immediate: " << immediate << '\n';
+
+    bool is_stack_pointer = Utils::is_bit_set(opcode, 11);
+    // std::cout << "Is Stack Pointer: " << is_stack_pointer << '\n';
+
+    // std::cout << "SP: " << get_sp() << '\n';
+    // std::cout << "PC: " << pc << '\n';
+    if (is_stack_pointer)
+        dest_register = get_sp() + immediate;
     else
     {
         // Where the PC is used as the source register (SP = 0), bit 1 of the PC is always read
         // as 0. The value of the PC will be 4 bytes greater than the address of the instruction
         // before bit 1 is forced to 0.
-        dest_register = (pc + immediate) - 2;
+        dest_register = (pc & ~3) + immediate;
     }
 }
 
 void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 { 
-    std::cout << "THUMB Load Store Halfword\n";
+    // std::cout << "THUMB Load Store Halfword\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1000);
 
     auto [dst_src_register, base_register] = thumb_get_dst_src(opcode);
     
     uint32_t offset6 = Utils::get_bits(opcode, 6, 11) << 1;
-    std::cout << "Offset: " << offset6 << '\n';
+    // std::cout << "Offset: " << offset6 << '\n';
 
     bool is_load = Utils::is_bit_set(opcode, 11);
-    std::cout << "Is Load: " << is_load << '\n';
+    // std::cout << "Is Load: " << is_load << '\n';
 
     uint32_t total_offset = base_register + offset6;
 
     if (is_load)
     {
-        std::cout << "Reading from memory @ " << total_offset << '\n';
+        // std::cout << "Reading from memory @ " << total_offset << '\n';
 
         // LDRH Rd,[odd] -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
         // Why doesn't NBA half-word align the address before loading it?
@@ -291,55 +293,112 @@ void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 
 void Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
 {
-    std::cout << "THUMB Load Store Immediate\n";
+    // std::cout << "THUMB Load Store Immediate\n";
 
     assert(Utils::get_bits(opcode, 13, 16) == 0b011);
 
     auto [dst_src_register, base_register] = thumb_get_dst_src(opcode);
-
+    
     uint32_t offset5 = Utils::get_bits(opcode, 6, 11);
-    bool is_load = Utils::is_bit_set(opcode, 11);
-    bool is_byte = Utils::is_bit_set(opcode, 12);
+    // std::cout << "Offset: " << offset5 << '\n';
 
+    bool is_load = Utils::is_bit_set(opcode, 11);
+    // std::cout << "Is Load: " << is_load << '\n';
+
+    bool is_byte = Utils::is_bit_set(opcode, 12);
+    // std::cout << "Is Byte: " << is_byte << '\n';
+
+    uint32_t final_offset = base_register;
     if (is_byte) 
     {
-        base_register += offset5;
+        final_offset += offset5;
         if (is_load)
-            dst_src_register = memory.read8(base_register);
+            dst_src_register = memory.read8(final_offset);
         else 
-            memory.write8(dst_src_register, base_register);
+            memory.write8(dst_src_register, final_offset);
     }   
     else 
     {
         offset5 <<= 2;     
-        base_register += offset5;
+        final_offset += offset5;
         if (is_load)
-            dst_src_register = memory.read32(base_register);
+        {
+            uint32_t val = memory.read32(final_offset);
+            dst_src_register = (final_offset & 3) ? alu_ror(val, (final_offset & 3) * 8, false) : val;
+        }
         else 
-            memory.write32(dst_src_register, base_register);
+            memory.write32(dst_src_register, final_offset);
     }
 }
 
 void Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t opcode)
 {
-    std::cout << "THUMB Load Store Sign-Extended Halfword/Byte\n";
+    assert(Utils::get_bits(opcode, 12, 16) == 0b0101);
+    assert(Utils::is_bit_set(opcode, 9));
+    
+    // std::cout << "THUMB Load Store Sign-Extended Halfword/Byte\n";
+
+    auto [dst_register, base_register] = thumb_get_dst_src(opcode);
+
+    int offset_reg_index = Utils::get_bits(opcode, 6, 9);
+    uint32_t offset_register = *registers[offset_reg_index];
+    // std::cout << "Offset Reg Index: " << offset_reg_index << '\n';
+    // std::cout << "Offset Register: " << offset_register << '\n';
+
+    bool is_sign_extended = Utils::is_bit_set(opcode, 10);
+    // std::cout << "Is Sign-Extended: " << is_sign_extended << '\n';
+
+    bool h_flag = Utils::is_bit_set(opcode, 11);
+    // std::cout << "H Flag: " << h_flag << '\n';
+
+    uint32_t final_offset = base_register + offset_register;
+    // std::cout << "Final Offset: " << final_offset << '\n';
+    if (is_sign_extended)
+    {
+        if (h_flag)
+        {
+            dst_register = (final_offset & 1) ? 
+                Utils::sign_extend32(memory.read8(final_offset + 1), 0, 7) : 
+                Utils::sign_extend32(memory.read16(final_offset), 0, 15);
+        } 
+        else
+            dst_register = Utils::sign_extend32(memory.read8(final_offset), 0, 7);
+    }
+    else 
+    {
+        if (h_flag)
+        {
+            uint16_t val = memory.read16(final_offset);
+            dst_register = (final_offset & 1) ? alu_ror(val, 8, false) : val;
+        }
+        else
+            memory.write16(dst_register, final_offset);
+    }
 }
 
 void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
 {
-    std::cout << "THUMB Load Store w/ Register Offset\n";
+    // std::cout << "THUMB Load Store w/ Register Offset\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b0101);
     assert(!Utils::is_bit_set(opcode, 9));
 
     auto [dst_register, base_register] = thumb_get_dst_src(opcode);
 
-    uint32_t& offset_register = *registers[Utils::get_bits(opcode, 6, 9)];
+    int offset_reg_index = Utils::get_bits(opcode, 6, 9);
+    uint32_t offset_register = *registers[offset_reg_index];
+    // std::cout << "Offset Reg Index: " << offset_reg_index << '\n';
+    // std::cout << "Offset Register: " << offset_register << '\n';
+
     uint32_t word8 = Utils::get_bits(opcode, 0, 8);
+    // std::cout << "Offset: " << word8 << '\n';
     bool is_byte = Utils::is_bit_set(opcode, 10);
+    // std::cout << "Is Load: " << is_byte << '\n';
     bool is_load = Utils::is_bit_set(opcode, 11);
+    // std::cout << "Is Load: " << is_load << '\n';
 
     uint32_t final_addr = base_register + offset_register;
+    // std::cout << "Final Addr: " << final_addr << '\n';
 
     if (is_byte) 
     {
@@ -351,7 +410,11 @@ void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
     else 
     {
         if (is_load)
-            dst_register = memory.read32(final_addr);
+        {
+            uint32_t val = memory.read32(final_addr);
+            // Reads from forcibly aligned address “addr AND (NOT 3)”, and does then rotate the data as “ROR (addr AND 3)*8”
+            dst_register = (final_addr & 3) ? alu_ror(val, (final_addr & 3) * 8, false) : val;
+        }
         else 
             memory.write32(dst_register, final_addr);
     }
@@ -359,17 +422,17 @@ void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
 
 void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 {
-    std::cout << "THUMB Long Branch w/ Link\n";
+    // std::cout << "THUMB Long Branch w/ Link\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1111);
 
     uint32_t offset = Utils::get_bits(opcode, 0, 11);
-    std::cout << "Offset: " << offset << '\n';
+    // std::cout << "Offset: " << offset << '\n';
 
     bool is_offset_low = Utils::is_bit_set(opcode, 11);
-    std::cout << "Is Offset Low: " << is_offset_low << '\n';
+    // std::cout << "Is Offset Low: " << is_offset_low << '\n';
 
-    std::cout << "PC Before: " << pc << '\n';
+    // std::cout << "PC Before: " << pc << '\n';
 
     if (is_offset_low)
     {
@@ -386,7 +449,7 @@ void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
 {
-    std::cout << "THUMB MOV/CMP/ADD/SUB Immediate\n";
+    // std::cout << "THUMB MOV/CMP/ADD/SUB Immediate\n";
 
     assert(Utils::get_bits(opcode, 13, 16) == 0b001);
 
@@ -414,43 +477,43 @@ void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
 
 void Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
 {
-    std::cout << "THUMB Move Shifted Register\n";
+    // std::cout << "THUMB Move Shifted Register\n";
 
     assert(Utils::get_bits(opcode, 13, 16) == 0b000);
 
     auto [dest_register, src_register] = thumb_get_dst_src(opcode);
 
     int operation = Utils::get_bits(opcode, 11, 13);
-    std::cout << "Operation: " << operation << '\n';
+    // std::cout << "Operation: " << operation << '\n';
     uint32_t offset5 = Utils::get_bits(opcode, 6, 11);
-    std::cout << "Offset 5: " << offset5 << '\n';
+    // std::cout << "Offset 5: " << offset5 << '\n';
 
     assert(operation != 0b11);
 
     dest_register = decode_shift_operation(src_register, offset5, operation);
 
-    std::cout << "Final Value: " << std::bitset<32>(dest_register) << '\n';
+    // std::cout << "Final Value: " << std::bitset<32>(dest_register) << '\n';
 }
 
 void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 {
-    std::cout << "THUMB Multiple Load Store\n";
+    // std::cout << "THUMB Multiple Load Store\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1100);
 
     int base_reg_index = Utils::get_bits(opcode, 8, 11);
-    std::cout << "Base Register Index: " << base_reg_index << '\n';
+    // std::cout << "Base Register Index: " << base_reg_index << '\n';
     uint32_t& base_register = *registers[base_reg_index];
     uint32_t address = base_register;
     uint32_t address_to_write_base = address;
 
     uint32_t r_list = Utils::get_bits(opcode, 0, 8);
-    std::cout << "R List: " << std::bitset<8>(r_list) << '\n';
+    // std::cout << "R List: " << std::bitset<8>(r_list) << '\n';
 
     bool is_load = Utils::is_bit_set(opcode, 11);
-    std::cout << "Is Load: " << is_load << '\n';
+    // std::cout << "Is Load: " << is_load << '\n';
 
-    std::cout << "Start Address: " << address << '\n';
+    // std::cout << "Start Address: " << address << '\n';
     bool first_register = true;
     bool base_is_first = true;
 
@@ -477,7 +540,7 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
             bool reg_index = Utils::is_bit_set(r_list, i);
             if (!reg_index) continue;
             *registers[i] = memory.read32(address);
-            std::cout << "Register " << i << ": " << *registers[i] << '\n'; 
+            // std::cout << "Register " << i << ": " << *registers[i] << '\n'; 
             address += 4;
         }
         else
@@ -508,7 +571,7 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
     if (!reg_index || !is_load)
         base_register = address; 
 
-    std::cout << "Final Address: " << address << '\n';
+    // std::cout << "Final Address: " << address << '\n';
 
     // Initial: 3543811841
     // STMIA is scuffed af
@@ -517,7 +580,7 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 // Passes all Tests
 void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
 {
-    std::cout << "THUMB PC Relative Load\n";
+    // std::cout << "THUMB PC Relative Load\n";
 
     assert(Utils::get_bits(opcode, 11, 16) == 0b01001);
     // Add unsigned offset (255 words,
@@ -526,32 +589,32 @@ void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
     // from the resulting address into Rd
     auto& dest_register = thumb_get_dst(opcode);
 
-    std::cout << "PC Initial Value: " << pc << '\n';
+    // std::cout << "PC Initial Value: " << pc << '\n';
 
     uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
-    std::cout << "Immediate: " << immediate10 << '\n';
+    // std::cout << "Immediate: " << immediate10 << '\n';
 
     uint32_t new_address = (pc + immediate10) & ~3;
-    std::cout << "Final Value: " << new_address << '\n';
+    // std::cout << "Final Value: " << new_address << '\n';
 
     dest_register = memory.read32(new_address);
 }
 
 void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
 {
-    std::cout << "THUMB PUSH/POP Registers\n";
+    // std::cout << "THUMB PUSH/POP Registers\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1011);
     assert(Utils::get_bits(opcode, 9, 11) == 0b10);
 
     int r_list = Utils::get_bits(opcode, 0, 8);
-    std::cout << std::bitset<8>(r_list) << '\n';
+    // std::cout << std::bitset<8>(r_list) << '\n';
     bool pc_lr_bit = Utils::is_bit_set(opcode, 8);
-    std::cout << "PC/LR: " << pc_lr_bit << '\n';
+    // std::cout << "PC/LR: " << pc_lr_bit << '\n';
     bool is_pop = Utils::is_bit_set(opcode, 11);
-    std::cout << "Is POP: " << is_pop << '\n';
+    // std::cout << "Is POP: " << is_pop << '\n';
 
-    std::cout << "Init SP value: " << get_sp() << '\n';
+    // std::cout << "Init SP value: " << get_sp() << '\n';
 
         
     if (r_list == 0 && !pc_lr_bit)
@@ -620,7 +683,7 @@ Final:
 
 void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 {
-    std::cout << "THUMB Software Interrupt\n";
+    // std::cout << "THUMB Software Interrupt\n";
 
     assert(Utils::get_bits(opcode, 8, 16) == 0b1101'1111);
 
@@ -636,24 +699,24 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 
 void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
 {
-    std::cout << "THUMB SP Relative Load/Store\n";
+    // std::cout << "THUMB SP Relative Load/Store\n";
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1001);
 
-    std::cout << "SP Before: " << get_sp() << '\n';
+    // std::cout << "SP Before: " << get_sp() << '\n';
 
     uint32_t& dest_register = thumb_get_dst(opcode);
-    std::cout << "Destination Value: " << dest_register << '\n';
+    // std::cout << "Destination Value: " << dest_register << '\n';
 
     uint32_t unsigned_offset10 = Utils::get_bits(opcode, 0, 8) << 2;
-    std::cout << "Offset: " << unsigned_offset10 << '\n';
+    // std::cout << "Offset: " << unsigned_offset10 << '\n';
 
     bool is_load = Utils::is_bit_set(opcode, 11);
-    std::cout << "Is Load: " << is_load << '\n';
+    // std::cout << "Is Load: " << is_load << '\n';
 
     uint32_t new_addr = get_sp() + unsigned_offset10;
-    std::cout << "New Address: " << new_addr << '\n';
-    std::cout << "New Address Last 2 bits: " << (new_addr & 3) << '\n';
+    // std::cout << "New Address: " << new_addr << '\n';
+    // std::cout << "New Address Last 2 bits: " << (new_addr & 3) << '\n';
     if (is_load)
     {
         uint32_t val = memory.read32(new_addr);
@@ -667,7 +730,7 @@ void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
 {
-    std::cout << "THUMB Unconditional Branch\n";
+    // std::cout << "THUMB Unconditional Branch\n";
 
     assert(Utils::get_bits(opcode, 11, 16) == 0b11100);
     
@@ -679,7 +742,7 @@ void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
 
 void Arm7TDMI::thumb_undefined(uint16_t opcode)
 {
-    std::cout << "THUMB Undefined\n";
+    // std::cout << "THUMB Undefined\n";
 
     old_cpsr = cpsr;
     handle_state_switch(CpuState::Arm);

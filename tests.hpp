@@ -56,7 +56,6 @@ public:
         return stream.str();
     }
 
-    /// @brief Runs instruction tests over a specified opcode range.
     static void run_test(Arm7TDMI& cpu, FakeMemory& mem, std::string file_name)
     {  
         std::ifstream file("./v1/" + file_name);
@@ -138,6 +137,11 @@ public:
                     mem.write16(static_cast<uint16_t>(data), addr);
                     std::cout << "^ Initialized!\n";
                 }
+                else if (ram["size"] == 1)
+                {
+                    mem.write8(static_cast<uint8_t>(data), addr);
+                    std::cout << "^ Initialized!\n";
+                }
             }
     
             uint16_t opcode = static_cast<uint16_t>((*it)["opcode"]);
@@ -197,6 +201,8 @@ public:
                     check_val(mem.read32(addr), data, std::string("word @ ") + std::to_string(addr));
                 else if (ram["size"] == 2)
                     check_val(mem.read16(addr), static_cast<uint16_t>(data), std::string("half word @ ") + std::to_string(addr));
+                else if (ram["size"] == 1)
+                    check_val(mem.read8(addr), static_cast<uint8_t>(data), std::string("byte @ ") + std::to_string(addr));
             }
 
             mem.clear_memory();

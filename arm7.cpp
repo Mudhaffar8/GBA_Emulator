@@ -12,7 +12,7 @@ void Arm7TDMI::test()
 {
     for (uint16_t op = 0; op < 256; ++op)
     {
-        std::cout << "Opcode: " << std::bitset<16>(op << 8) << ", ";
+        // std::cout << "Opcode: " << std::bitset<16>(op << 8) << ", ";
         thumb_execute(op << 8);
     }
 }   
@@ -48,13 +48,13 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     cpsr &= ~ProgramStatusRegsiter::Mode;
     cpsr |= new_mode;
 
-    std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
+    // std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
 
     switch(new_mode)
     {
     case CpuMode::User:
     case CpuMode::System:
-        std::cout << "USER/SYSTEM\n";
+        // std::cout << "USER/SYSTEM\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -65,7 +65,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::FastInterrupt:
-        std::cout << "FIQ\n";
+        // std::cout << "FIQ\n";
         registers[8] = &r8_fiq;
         registers[9] = &r9_fiq;
         registers[10] = &r10_fiq;
@@ -76,7 +76,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::InterruptRequest:
-        std::cout << "IRQ\n";
+        // std::cout << "IRQ\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -88,7 +88,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::Supervisor:
-        std::cout << "SVC\n";
+        // std::cout << "SVC\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -100,7 +100,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::Abort:
-        std::cout << "ABT\n";
+        // std::cout << "ABT\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -112,7 +112,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::Undefined:
-        std::cout << "UND\n";
+        // std::cout << "UND\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -139,9 +139,9 @@ void Arm7TDMI::handle_state_switch(CpuState new_state)
 
 void Arm7TDMI::branch_and_exchange(uint32_t address)
 {
-    std::cout << "Old PC: " << pc << '\n';
-    std::cout << "New Branch Address: " << address << '\n';
-    std::cout << "Lower 2 bits: " << (address & 3) << '\n';
+    // std::cout << "Old PC: " << pc << '\n';
+    // std::cout << "New Branch Address: " << address << '\n';
+    // std::cout << "Lower 2 bits: " << (address & 3) << '\n';
 
     uint32_t new_address = Utils::get_bits(address, 1, 32) << 1;
     if (address & 1)

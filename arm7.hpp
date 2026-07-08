@@ -214,14 +214,14 @@ private:
         int dst_reg_index = Utils::get_bits(opcode, 0, 3);
         int src_reg_index = Utils::get_bits(opcode, 3, 6);
 
-        std::cout << "Destination Idx: " << dst_reg_index << '\n';
-        std::cout << "Source Idx: " << src_reg_index << '\n';
+        // std::cout << "Destination Idx: " << dst_reg_index << '\n';
+        // std::cout << "Source Idx: " << src_reg_index << '\n';
 
         uint32_t& dest_register = *registers[dst_reg_index];
         uint32_t& src_register = *registers[src_reg_index];
 
-        std::cout << "Dest Register Value: " << dest_register << '\n';
-        std::cout << "Src Register Value: " << src_register << '\n';
+        // std::cout << "Dest Register Value: " << dest_register << '\n';
+        // std::cout << "Src Register Value: " << src_register << '\n';
 
         return {dest_register, src_register};
     }
@@ -229,7 +229,7 @@ private:
     inline uint32_t& thumb_get_dst(uint16_t opcode) const
     {
         int dst_reg_index = Utils::get_bits(opcode, 8, 11);
-        std::cout << "Destination Idx: " << dst_reg_index << '\n';
+        // std::cout << "Destination Idx: " << dst_reg_index << '\n';
         uint32_t& dest_register = *registers[dst_reg_index];
         return dest_register;
     }
