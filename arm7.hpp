@@ -103,7 +103,7 @@ private:
     uint32_t r13_abt{}, r14_abt{}; // Abort
     uint32_t r13_irq{}, r14_irq{}; // IRQ
     uint32_t r13_und{}, r14_und{}; // Undefined
-    
+
     std::array<uint32_t*, 16> registers 
     {{
         &r0, &r1, &r2, &r3, &r4, &r5, &r6, &r7,

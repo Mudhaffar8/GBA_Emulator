@@ -238,7 +238,8 @@ uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc)
         uint8_t rotate_amount = Utils::get_bits(op2, 0, 5);
         std::cout << "Rotate Amount: " << +rotate_amount << '\n';
         
-        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, rotate_amount - 1));
+        if (set_cc)
+            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, rotate_amount - 1));
 
         uint32_t bits_shifted_out = Utils::get_bits(op1, 0, rotate_amount);
         std::cout << "Bits Shifted Out: " << std::bitset<32>(bits_shifted_out) << '\n';

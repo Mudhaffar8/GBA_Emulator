@@ -12,7 +12,8 @@ int main()
 
     // Passes thumb_mov_cmp_add_sub.json, thumb_add_sub.json, thumb_b.json, 
     // thumb_bcc.json, thumb_add_sub_sp.json, thumb_push_pop.json, thumb_ldm_stm.json
-    // thumb_ldr_pc_rel.json, thumb_lsl_lsr_asr.json, thumb_swi.json, 
+    // thumb_ldr_pc_rel.json, thumb_lsl_lsr_asr.json, thumb_swi.json, thumb_bx.json
+    // thumb_ldrh_strh_imm_offset.json
     // thumb_undefined_bcc (I guess), and thumb_data_proc.json (not cpsr flags for mult)
     GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");
     GBATests::run_test(cpu, memory, "thumb_add_sub.json");
@@ -26,6 +27,8 @@ int main()
     GBATests::run_test(cpu, memory, "thumb_swi.json");
     GBATests::run_test(cpu, memory, "thumb_undefined_bcc.json");
     GBATests::run_test(cpu, memory, "thumb_data_proc.json");
+    GBATests::run_test(cpu, memory, "thumb_ldrh_strh_imm_offset.json");
+    GBATests::run_test(cpu, memory, "thumb_bx.json");
 
     return 0;
 }

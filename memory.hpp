@@ -62,6 +62,7 @@ public:
 
     void write16(uint16_t half_word, uint32_t address)
     {
+        std::cout << "Wrote half word " << half_word << " @ " << address << '\n';
         write8(half_word & 0xFF, address);
         write8((half_word >> 8) & 0xFF, address + 1);
     }

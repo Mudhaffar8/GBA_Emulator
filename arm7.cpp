@@ -77,6 +77,11 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 
     case CpuMode::InterruptRequest:
         std::cout << "IRQ\n";
+        registers[8] = &r8;
+        registers[9] = &r9;
+        registers[10] = &r10;
+        registers[11] = &r11;
+        registers[12] = &r12;
         registers[13] = &r13_irq;
         registers[14] = &r14_irq;
         spsr_irq = old_cpsr; 
@@ -84,6 +89,11 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 
     case CpuMode::Supervisor:
         std::cout << "SVC\n";
+        registers[8] = &r8;
+        registers[9] = &r9;
+        registers[10] = &r10;
+        registers[11] = &r11;
+        registers[12] = &r12;
         registers[13] = &r13_svc;
         registers[14] = &r14_svc;
         spsr_svc = old_cpsr; 
@@ -91,6 +101,11 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 
     case CpuMode::Abort:
         std::cout << "ABT\n";
+        registers[8] = &r8;
+        registers[9] = &r9;
+        registers[10] = &r10;
+        registers[11] = &r11;
+        registers[12] = &r12;
         registers[13] = &r13_abt;
         registers[14] = &r14_abt;
         spsr_abt = old_cpsr; 
@@ -98,6 +113,11 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 
     case CpuMode::Undefined:
         std::cout << "UND\n";
+        registers[8] = &r8;
+        registers[9] = &r9;
+        registers[10] = &r10;
+        registers[11] = &r11;
+        registers[12] = &r12;
         registers[13] = &r13_und;
         registers[14] = &r14_und;
         spsr_und = old_cpsr; 
@@ -119,19 +139,24 @@ void Arm7TDMI::handle_state_switch(CpuState new_state)
 
 void Arm7TDMI::branch_and_exchange(uint32_t address)
 {
+    std::cout << "Old PC: " << pc << '\n';
     std::cout << "New Branch Address: " << address << '\n';
-    std::cout << "Thumb Mode: " << (address & 1) << '\n';
+    std::cout << "Lower 2 bits: " << (address & 3) << '\n';
+
+    uint32_t new_address = Utils::get_bits(address, 1, 32) << 1;
     if (address & 1)
     {
-        std::cout << "Switching to THUMB!\n";
-        pc = (address & ~1) + 4;
+        pc = new_address + 4;
         handle_state_switch(CpuState::Thumb);
     }
     else
     {
-        pc = address + 8;
+        // 0b10 is unpredictable behaviour
+        pc = new_address + 8;
         handle_state_switch(CpuState::Arm);
     }
+
+    is_branched = true;
 }
 
 /* */

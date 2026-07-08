@@ -206,7 +206,10 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
     uint32_t src_register = *registers[src_reg_index];
     std::cout << "Dst Reg Index: " << dst_reg_index << '\n';
     std::cout << "Src Reg Index: " << src_reg_index << '\n';
-
+    std::cout << "Dst Reg: " << dest_register << '\n';
+    std::cout << "Src Reg: " << src_register << '\n';
+    std::cout << "Src Reg User: " << *user_registers[src_reg_index] << '\n';
+    
     // In this group only CMP (Op = 01) sets the CPSR condition codes.
     switch(operation)
     {
@@ -276,8 +279,22 @@ void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 
     if (is_load)
     {
-        dst_src_register = memory.read16(total_offset);
-        dst_src_register &= 0xFFFF;
+        std::cout << "Reading from memory @ " << total_offset << '\n';
+
+        // LDRH Rd,[odd] -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
+        // Why doesn't NBA half-word align the address before loading it?
+        if (total_offset & 1) 
+        {
+            uint16_t val = memory.read16(total_offset);
+            std::cout << "Value read: " << val << '\n';
+            dst_src_register = alu_ror(val, 8, false);
+        }
+        else 
+        {
+            uint16_t val = memory.read16(total_offset);
+            std::cout << "Value read: " << val << '\n';
+            dst_src_register = val;
+        }
     }
     else 
         memory.write16(dst_src_register & 0xFFFF, total_offset);

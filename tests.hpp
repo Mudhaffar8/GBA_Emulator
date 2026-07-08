@@ -133,6 +133,11 @@ public:
                     mem.write32(data, addr);
                     std::cout << "^ Initialized!\n";
                 }
+                else if (ram["size"] == 2)
+                {
+                    mem.write16(static_cast<uint16_t>(data), addr);
+                    std::cout << "^ Initialized!\n";
+                }
             }
     
             uint16_t opcode = static_cast<uint16_t>((*it)["opcode"]);
@@ -187,9 +192,11 @@ public:
 
                 uint32_t data = static_cast<uint32_t>(ram["data"]);
                 uint32_t addr = static_cast<uint32_t>(ram["addr"]);
-                
+
                 if (ram["size"] == 4)
                     check_val(mem.read32(addr), data, std::string("word @ ") + std::to_string(addr));
+                else if (ram["size"] == 2)
+                    check_val(mem.read16(addr), static_cast<uint16_t>(data), std::string("half word @ ") + std::to_string(addr));
             }
 
             mem.clear_memory();
@@ -197,7 +204,7 @@ public:
             std::cout << "\nPassed Test #" << number++ << '\n';
         }
 
-        std::cout << "Passed All Test: " << file_name << '\n';
+        std::cout << "Passed All Tests: " << file_name << '\n';
         std::cout << "------------------------\n";
     }
-};
+};    
