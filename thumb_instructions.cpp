@@ -208,7 +208,6 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
     std::cout << "Src Reg Index: " << src_reg_index << '\n';
     std::cout << "Dst Reg: " << dest_register << '\n';
     std::cout << "Src Reg: " << src_register << '\n';
-    std::cout << "Src Reg User: " << *user_registers[src_reg_index] << '\n';
     
     // In this group only CMP (Op = 01) sets the CPSR condition codes.
     switch(operation)
@@ -283,18 +282,8 @@ void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 
         // LDRH Rd,[odd] -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
         // Why doesn't NBA half-word align the address before loading it?
-        if (total_offset & 1) 
-        {
-            uint16_t val = memory.read16(total_offset);
-            std::cout << "Value read: " << val << '\n';
-            dst_src_register = alu_ror(val, 8, false);
-        }
-        else 
-        {
-            uint16_t val = memory.read16(total_offset);
-            std::cout << "Value read: " << val << '\n';
-            dst_src_register = val;
-        }
+        uint16_t val = memory.read16(total_offset);
+        dst_src_register = (total_offset & 1) ? alu_ror(val, 8, false) : val;
     }
     else 
         memory.write16(dst_src_register & 0xFFFF, total_offset);
@@ -374,17 +363,24 @@ void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1111);
 
-    uint32_t offset = Utils::get_bits(offset, 0, 11);
+    uint32_t offset = Utils::get_bits(opcode, 0, 11);
+    std::cout << "Offset: " << offset << '\n';
+
     bool is_offset_low = Utils::is_bit_set(opcode, 11);
+    std::cout << "Is Offset Low: " << is_offset_low << '\n';
+
+    std::cout << "PC Before: " << pc << '\n';
 
     if (is_offset_low)
     {
-        uint32_t temp = pc - 2;
-        pc = *registers[13] + (offset << 1);
-        *registers[13] = temp | 1;
+        uint32_t next_instr_addr = pc - 2;
+        pc = (get_link() + (offset << 1) + 4) & ~1;
+        get_link() = next_instr_addr | 1;
+
+        is_branched = true;
     }
     else
-        *registers[13] = pc + (offset << 12);
+        get_link() = pc + (Utils::sign_extend32(offset, 0, 10) << 12);
 }
 
 // Passes All Tests
@@ -644,8 +640,10 @@ void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1001);
 
+    std::cout << "SP Before: " << get_sp() << '\n';
+
     uint32_t& dest_register = thumb_get_dst(opcode);
-    std::cout << "Destination: " << dest_register << '\n';
+    std::cout << "Destination Value: " << dest_register << '\n';
 
     uint32_t unsigned_offset10 = Utils::get_bits(opcode, 0, 8) << 2;
     std::cout << "Offset: " << unsigned_offset10 << '\n';
@@ -653,13 +651,17 @@ void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
     bool is_load = Utils::is_bit_set(opcode, 11);
     std::cout << "Is Load: " << is_load << '\n';
 
-    *registers[13] += unsigned_offset10;
-    std::cout << "SP + Offset: " << *registers[13] << '\n';
-    
+    uint32_t new_addr = get_sp() + unsigned_offset10;
+    std::cout << "New Address: " << new_addr << '\n';
+    std::cout << "New Address Last 2 bits: " << (new_addr & 3) << '\n';
     if (is_load)
-        dest_register = memory.read32(*registers[13]);
+    {
+        uint32_t val = memory.read32(new_addr);
+        // Reads from forcibly aligned address “addr AND (NOT 3)”, and does then rotate the data as “ROR (addr AND 3)*8”
+        dest_register = (new_addr & 3) ? alu_ror(val, (new_addr & 3) * 8, false) : val;
+    }
     else 
-        memory.write32(dest_register, *registers[13]);
+        memory.write32(dest_register, new_addr);
 }
 
 // Passes All Tests
