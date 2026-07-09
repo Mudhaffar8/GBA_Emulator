@@ -103,30 +103,6 @@ uint32_t Arm7TDMI::alu_orr(uint32_t op1, uint32_t op2, bool set_cc)
     return result;
 }
 
-uint32_t Arm7TDMI::alu_rsb(uint32_t op1, uint32_t op2, bool set_cc) 
-{ 
-    uint32_t result = op2 - op1;
-    if (set_cc)
-    {
-        set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, op2 > op1);
-        set_cpsr(ProgramStatusRegsiter::V, (op2 - op1) < std::numeric_limits<int>().min());
-    }
-    return result;
-}
-
-uint32_t Arm7TDMI::alu_rsc(uint32_t op1, uint32_t op2, bool set_cc) 
-{ 
-    uint32_t result = op2 - op1 - !c_set();
-    if (set_cc)
-    {
-        set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, op2 - !c_set() > op1);
-        set_cpsr(ProgramStatusRegsiter::V, (op1 - op2 - !c_set()) < std::numeric_limits<int>().min());
-    }
-    return result;
-}
-
 uint32_t Arm7TDMI::alu_sbc(uint32_t op1, uint32_t op2, bool set_cc) 
 { 
     uint32_t result = op1 - op2 - !c_set();

@@ -208,6 +208,36 @@ private:
     void thumb_unconditional_branch(uint16_t opcode);
     void thumb_undefined(uint16_t opcode);
 
+    /* ARM Helper Methods */
+    inline std::pair<uint32_t&, uint32_t&> arm_get_rn_rd(uint32_t opcode) const
+    {
+        int dst_reg_index = Utils::get_bits(opcode, 12, 16);
+        int src_reg_index = Utils::get_bits(opcode, 16, 20);
+
+        // std::cout << "Destination Idx: " << dst_reg_index << '\n';
+        // std::cout << "Source Idx: " << src_reg_index << '\n';
+
+        uint32_t& dest_register = *registers[dst_reg_index];
+        uint32_t& src_register = *registers[src_reg_index];
+
+        // std::cout << "Dest Register Value: " << dest_register << '\n';
+        // std::cout << "Src Register Value: " << src_register << '\n';
+
+        return {src_register, dest_register};
+    }
+
+    inline uint32_t& arm_get_rm(uint32_t opcode)
+    {
+        int rm_index = Utils::get_bits(opcode, 0, 4);
+        return *registers[rm_index];
+    }
+
+    inline uint32_t& arm_get_rs(uint32_t opcode)
+    {
+        int rm_index = Utils::get_bits(opcode, 8, 12);
+        return *registers[rm_index];
+    }
+
     /* Thumb Helper Methods */
     inline std::pair<uint32_t&, uint32_t&> thumb_get_dst_src(uint16_t opcode) const
     {

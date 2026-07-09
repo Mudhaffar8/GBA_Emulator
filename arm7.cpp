@@ -17,6 +17,9 @@ void Arm7TDMI::test()
     }
 }   
 
+void Arm7TDMI::tick()
+{}
+
 
 bool Arm7TDMI::check_condition_code(uint32_t code)
 {
@@ -161,7 +164,19 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
 
 /* */
 void Arm7TDMI::arm_execute(uint32_t opcode)
-{}
+{
+    is_branched = false;
+
+    uint32_t condition_code = Utils::get_bits(opcode, 28, 32);
+    if (check_condition_code(condition_code))
+    {
+        int index = (Utils::get_bits(opcode, 20, 28) << 8) | Utils::get_bits(opcode, 4, 8);
+        (this->*arm_instr_table[index])(opcode);
+    }
+
+    if (!is_branched)
+        pc += 4;
+}
 
 void Arm7TDMI::thumb_execute(uint16_t opcode)
 {

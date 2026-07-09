@@ -71,8 +71,6 @@ public:
 
         std::cout << "Running Test File: " << file_name << '\n';
 
-        cpu.state = Arm7TDMI::CpuState::Thumb;
-
         int number = 1;
         for (json::iterator it = data.begin(); it != data.end(); ++it)
         {
@@ -143,10 +141,17 @@ public:
                     std::cout << "^ Initialized!\n";
                 }
             }
-    
-            uint16_t opcode = static_cast<uint16_t>((*it)["opcode"]);
-
-            cpu.thumb_execute(opcode);
+            
+            if (Arm7TDMI::ProgramStatusRegsiter::T == 0)
+            {
+                uint32_t opcode = static_cast<uint32_t>((*it)["opcode"]);
+                cpu.arm_execute(opcode);
+            }
+            else
+            {
+                uint16_t opcode = static_cast<uint16_t>((*it)["opcode"]);
+                cpu.thumb_execute(opcode);
+            }
 
             // Set CPU register values
             for (int i = 0; i < 8; ++i)
