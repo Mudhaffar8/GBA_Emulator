@@ -132,6 +132,22 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     }
 }
 
+uint32_t Arm7TDMI::get_mode_spsr(CpuMode mode)
+{
+    switch(mode)
+    {
+    case CpuMode::User:
+    case CpuMode::System:
+        return cpsr;
+    
+    case CpuMode::Abort: return spsr_abt;
+    case CpuMode::Supervisor: return spsr_svc;
+    case CpuMode::FastInterrupt: return spsr_fiq;
+    case CpuMode::InterruptRequest: return spsr_irq;
+    case CpuMode::Undefined: return spsr_und;
+    }
+}
+
 void Arm7TDMI::handle_state_switch(CpuState new_state)
 {
     state = new_state;

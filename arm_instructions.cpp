@@ -55,7 +55,7 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
 
         int shift_type = Utils::get_bits(opcode, 5, 7);
         bool is_register_shift = Utils::is_bit_set(opcode, 4);
-        
+
         if (is_register_shift)
         {
             int shift_register_index = Utils::get_bits(opcode, 8, 12);
@@ -64,7 +64,7 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         else
             shift_amount = Utils::get_bits(opcode, 7, 12);
 
-        op2_register = decode_shift_operation(op2_register, shift_amount, shift_type);
+        op2 = decode_shift_operation(op2_register, shift_amount, shift_type);
     }
 
     switch(operation)
@@ -123,34 +123,166 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     }
 }
 
+void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
+{
+    // This instruction is going to break me :sob:
+    // It'd be a good idea to break this into seperate instructions
+    assert(Utils::get_bits(opcode, 25, 28) == 0b100);
+
+    int base_register_index = Utils::get_bits(opcode, 16, 20);
+    uint32_t& base_register = *registers[base_register_index];
+
+    int register_list = Utils::get_bits(opcode, 0, 16);
+
+    bool add_offset_before_transfer = Utils::is_bit_set(opcode, 24); // P
+    bool add_offset_to_base = Utils::is_bit_set(opcode, 23); // U
+    bool load_psr_or_force_usr_mode = Utils::is_bit_set(opcode, 22); // S
+    bool writeback_to_base = Utils::is_bit_set(opcode, 21); // W
+    bool load_from_memory = Utils::is_bit_set(opcode, 20); // L
+
+    uint32_t offset_amount = (add_offset_to_base) ? 4 : -4;
+    uint32_t inital_address = base_register;
+
+    if (load_from_memory)
+    {
+        for (int i = 0; i < 15; ++i)
+        {
+            if (!Utils::is_bit_set(register_list, i)) continue;
+
+            if (add_offset_before_transfer) 
+            { 
+                inital_address += offset_amount;
+                *registers[i] = memory.read32(inital_address);
+            }
+            else
+            {
+                *registers[i] = memory.read32(inital_address);
+                inital_address += offset_amount;
+            }
+        }  
+
+        if (Utils::is_bit_set(register_list, 15))
+        {
+            if (add_offset_before_transfer) 
+            { 
+                inital_address += offset_amount;
+                pc = memory.read32(inital_address);
+            }
+            else
+            {
+                pc = memory.read32(inital_address);
+                inital_address += offset_amount;
+            }
+        }
+
+        if (load_psr_or_force_usr_mode)
+            cpsr = get_mode_spsr(mode);
+    }
+    else
+    {
+        for (int i = 0; i < 15; ++i)
+        {
+            if (!Utils::is_bit_set(register_list, i)) continue;
+
+            if (add_offset_before_transfer) 
+            { 
+                inital_address += offset_amount;
+                memory.write32(*registers[i], inital_address);
+            }
+            else
+            {
+                memory.write32(*registers[i], inital_address);
+                inital_address += offset_amount;
+            }
+        }  
+
+        if (Utils::is_bit_set(register_list, 15))
+        {
+            if (add_offset_before_transfer) 
+            { 
+                inital_address += offset_amount;
+                memory.write32(pc, inital_address);
+            }
+            else
+            {
+                memory.write32(pc, inital_address);
+                inital_address += offset_amount;
+            }
+        }
+
+        if (load_psr_or_force_usr_mode)
+            cpsr = get_mode_spsr(mode);       
+        
+    }
+
+    if (writeback_to_base)
+        base_register = inital_address;
+}
+
 void Arm7TDMI::arm_multiply(uint32_t opcode)
 {
     assert(Utils::get_bits(opcode, 22, 28) == 0);
     assert(Utils::get_bits(opcode, 4, 8) == 0b1001);
 
     bool set_condition_codes = Utils::is_bit_set(opcode, 20);
-    bool multiply_and_accumulate = Utils::is_bit_set(opcode, 21);
-    bool is_signed = Utils::is_bit_set(opcode, 22);
+    bool accumulate = Utils::is_bit_set(opcode, 21);
 
-    int src_reg_index = Utils::get_bits(opcode, 16, 20);
-    int op2_reg_index = Utils::get_bits(opcode, 16, 20);
-    int dst_reg_index = Utils::get_bits(opcode, 16, 20);
+    auto [dst_register, op1_register_mult] = arm_get_rn_rd(opcode);
+    uint32_t op2_register_mult = arm_get_rs(opcode);
+    uint32_t op3_register_add = arm_get_rm(opcode);
 
-    /// @todo
+    dst_register = (op1_register_mult * op2_register_mult) + (accumulate * op3_register_add);
+
+    if (set_condition_codes)
+    {
+        set_negative_and_zero(dst_register);
+        set_cpsr(ProgramStatusRegsiter::C, dst_register < op1_register_mult);
+        
+        // skip_mult_instr = true;
+    }
 }
 
 void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 {
     assert(Utils::get_bits(opcode, 23, 28) == 1);
-    
+    assert(Utils::get_bits(opcode, 4, 8) == 0b1001);
+
     bool set_condition_codes = Utils::is_bit_set(opcode, 20);
-    bool multiply_and_accumulate = Utils::is_bit_set(opcode, 21);
+    bool accumulate = Utils::is_bit_set(opcode, 21);
+    bool is_signed = Utils::is_bit_set(opcode, 22);
 
-    int src_reg_index = Utils::get_bits(opcode, 8, 12);
-    int dst_reg_lo_index = Utils::get_bits(opcode, 12, 16);
-    int dst_reg_hi_index = Utils::get_bits(opcode, 16, 20);
+    auto [dst_register_hi, dst_register_lo] = arm_get_rn_rd(opcode);
+    uint32_t op1_register_mult = arm_get_rs(opcode);
+    uint32_t op2_register_mult = arm_get_rm(opcode);
 
-    /// @todo
+    if (is_signed)
+    {
+        int32_t op1_signed = static_cast<int32_t>(op1_register_mult);
+        int32_t op2_signed = static_cast<int32_t>(op2_register_mult);
+
+        int64_t result = (op1_register_mult * op2_register_mult) + 
+            (accumulate * (dst_register_hi << 8 | dst_register_lo));
+
+        dst_register_hi = (result >> 32) & 0xFFFFFFFF;
+        dst_register_lo = result & 0xFFFFFFFF;
+    }
+    else
+    {
+        uint64_t result = (op1_register_mult * op2_register_mult) + 
+            (accumulate * (dst_register_hi << 8 | dst_register_lo));
+
+        dst_register_hi = (result >> 32) & 0xFFFFFFFF;
+        dst_register_lo = result & 0xFFFFFFFF;
+    }
+
+    if (set_condition_codes)
+    {
+        set_cpsr(ProgramStatusRegsiter::N, dst_register_hi);
+        set_cpsr(ProgramStatusRegsiter::Z, dst_register_hi == 0 && dst_register_lo == 0);
+        set_cpsr(ProgramStatusRegsiter::C, dst_register_hi < op1_register_mult);
+        
+        // skip_mult_instr = true;
+    }
 }
 
 // 2S + 1N + 1I

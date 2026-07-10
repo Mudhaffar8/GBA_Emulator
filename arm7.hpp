@@ -120,7 +120,7 @@ private:
     CpuState state = CpuState::Arm;
 
     bool is_branched = false;
-    bool skip_mult_instr = false; // Skipping mult instructions on SST
+    bool skip_mult_instr = false; // Skipping mult cpsr flag on SST
 private:
     inline uint32_t& get_sp() { return *registers[13]; }
     inline uint32_t& get_link() { return *registers[14]; }
@@ -134,6 +134,8 @@ private:
 
     void handle_mode_switch(uint32_t new_mode);
     void handle_state_switch(CpuState new_state);
+
+    uint32_t get_mode_spsr(CpuMode mode);
 
     bool check_condition_code(uint32_t code);
     constexpr void set_cpsr(ProgramStatusRegsiter bit, bool cond) { cpsr = (cond) ? (cpsr | bit) : (cpsr & ~bit); }
@@ -156,8 +158,6 @@ private:
     uint32_t alu_mov(uint32_t op2, bool set_cc); // RD:= op2
     uint32_t alu_mvn(uint32_t op2, bool set_cc);
     uint32_t alu_orr(uint32_t op1, uint32_t op2, bool set_cc);
-    uint32_t alu_rsb(uint32_t op1, uint32_t op2, bool set_cc);
-    uint32_t alu_rsc(uint32_t op1, uint32_t op2, bool set_cc);
     uint32_t alu_sbc(uint32_t op1, uint32_t op2, bool set_cc);
     uint32_t alu_sub_cmp(uint32_t op1, uint32_t op2, bool set_cc);
     uint32_t alu_lsl(uint32_t op1, uint32_t op2, bool set_cc); // Logical Shift Left
@@ -173,6 +173,7 @@ private:
     /* ARM Instructions */
     void arm_branch(uint32_t opcode); // Branch, Branch and Link
     void arm_branch_and_exchange(uint32_t opcode);
+    void arm_block_data_transfer(uint32_t opcode);
     void arm_coprocessor_data_operation(uint32_t opcode);
     void arm_coprocessor_data_transfer(uint32_t opcode);
     void arm_coprocessor_register_transfer(uint32_t opcode);
@@ -209,6 +210,9 @@ private:
     void thumb_undefined(uint16_t opcode);
 
     /* ARM Helper Methods */
+    // Bits 12-15 for Dst, Bits 16-19 for Src
+    // Normally in order Rd, Rn
+    // Src for than dst usually
     inline std::pair<uint32_t&, uint32_t&> arm_get_rn_rd(uint32_t opcode) const
     {
         int dst_reg_index = Utils::get_bits(opcode, 12, 16);
@@ -225,13 +229,15 @@ private:
 
         return {src_register, dest_register};
     }
-
+    
+    // Bits 0-3
     inline uint32_t& arm_get_rm(uint32_t opcode)
     {
         int rm_index = Utils::get_bits(opcode, 0, 4);
         return *registers[rm_index];
     }
 
+    // Bits 8-11
     inline uint32_t& arm_get_rs(uint32_t opcode)
     {
         int rm_index = Utils::get_bits(opcode, 8, 12);

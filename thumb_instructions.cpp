@@ -157,8 +157,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         dest_register = alu_bic(dest_register, src_register, true);
         break;
     case 0b1111: // MVN Rd, Rs -> NOT Rs
-        dest_register = ~src_register;
-        set_negative_and_zero(dest_register);
+        dest_register = alu_mov(~src_register, true);
         break;
     default:
         throw std::runtime_error("ERROR (THUMB HI REG Operation): " + operation);
