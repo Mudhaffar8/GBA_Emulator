@@ -29,6 +29,24 @@ void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
     branch_and_exchange(address);
 }
 
+// Unused as GBA has no coprocessors
+void Arm7TDMI::arm_coprocessor_data_operation(uint32_t opcode) 
+{
+    assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
+    assert(!Utils::is_bit_set(opcode, 4));
+}
+
+void Arm7TDMI::arm_coprocessor_data_transfer(uint32_t opcode) 
+{
+    assert(Utils::get_bits(opcode, 25, 28) == 0b110);
+}
+
+void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode) 
+{
+    assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
+    assert(Utils::is_bit_set(opcode, 4));
+}
+
 void Arm7TDMI::arm_data_processing(uint32_t opcode)
 {
     assert(Utils::get_bits(opcode, 26, 28) == 0b00);
@@ -56,13 +74,9 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         int shift_type = Utils::get_bits(opcode, 5, 7);
         bool is_register_shift = Utils::is_bit_set(opcode, 4);
 
-        if (is_register_shift)
-        {
-            int shift_register_index = Utils::get_bits(opcode, 8, 12);
-            shift_amount = *registers[shift_register_index] & 0xFF;
-        }
-        else
-            shift_amount = Utils::get_bits(opcode, 7, 12);
+        shift_amount = (is_register_shift) ? 
+            arm_get_rs(opcode) : 
+            Utils::get_bits(opcode, 7, 12);
 
         op2 = decode_shift_operation(op2_register, shift_amount, shift_type);
     }
@@ -140,7 +154,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
     bool writeback_to_base = Utils::is_bit_set(opcode, 21); // W
     bool load_from_memory = Utils::is_bit_set(opcode, 20); // L
 
-    uint32_t offset_amount = (add_offset_to_base) ? 4 : -4;
+    int offset_amount = (add_offset_to_base) ? 4 : -4;
     uint32_t inital_address = base_register;
 
     if (load_from_memory)
@@ -219,6 +233,124 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         base_register = inital_address;
 }
 
+void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
+{
+    assert(Utils::get_bits(opcode, 25, 28) == 0);
+    assert(Utils::get_bits(opcode, 7, 12) == 1);
+    assert(Utils::is_bit_set(opcode, 4));
+
+    bool add_before_transfer = Utils::is_bit_set(opcode, 24);
+    bool add_to_offset = Utils::is_bit_set(opcode, 23);
+    bool writeback_to_base = Utils::is_bit_set(opcode, 22);
+    bool is_load = Utils::is_bit_set(opcode, 21);
+    bool sh_flag = Utils::get_bits(opcode, 5, 7);
+
+    assert(sh_flag != 0); // 0b00 is the SWAP instruction
+
+    auto [base_register, dst_src_register] = arm_get_rn_rd(opcode);
+    uint32_t offset_register = arm_get_rm(opcode);
+
+    uint32_t offset_hi = Utils::get_bits(opcode, 8, 12);
+
+    uint32_t total_offset = (offset_hi == 0) ? 
+        (offset_hi << 4) | Utils::get_bits(opcode, 0, 4) : 
+        arm_get_rm(opcode);
+        
+    int offset_amount = (add_to_offset) ? total_offset : -total_offset;
+    uint32_t base_address = base_register;
+    if (sh_flag == 0b01) // Unsigned Halfwords
+    {
+        if (is_load)
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                dst_src_register = memory.read16(base_address);
+            }
+            else
+            {
+                dst_src_register = memory.read16(base_address);
+                base_register += offset_amount;
+            }
+        }
+        else
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                memory.write16(dst_src_register, base_address);
+            }
+            else
+            {
+                memory.write16(dst_src_register, base_address);
+                base_address += offset_amount;
+            }
+        }
+    }
+    else if (sh_flag == 0b10) // Signed Byte
+    {
+        if (is_load)
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                dst_src_register = Utils::sign_extend32(memory.read8(base_address), 0, 15);
+            }
+            else
+            {
+                dst_src_register = Utils::sign_extend32(memory.read8(base_address), 0, 15);
+                base_register += offset_amount;
+            }
+        }
+        else
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                memory.write8(dst_src_register, base_address);
+            }
+            else
+            {
+                memory.write8(dst_src_register, base_address);
+                base_address += offset_amount;
+            }
+        }
+    }
+    else // Signed Halfwords
+    {
+        if (is_load)
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                dst_src_register = Utils::sign_extend32(memory.read16(base_address), 0, 15);
+            }
+            else
+            {
+                dst_src_register = Utils::sign_extend32(memory.read16(base_address), 0, 15);
+                base_register += offset_amount;
+            }
+        }
+        else
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                memory.write16(dst_src_register, base_address);
+            }
+            else
+            {
+                memory.write16(dst_src_register, base_address);
+                base_address += offset_amount;
+            }
+        }
+    }
+
+    if (writeback_to_base)
+        base_register = base_address;
+}
+
+
 void Arm7TDMI::arm_multiply(uint32_t opcode)
 {
     assert(Utils::get_bits(opcode, 22, 28) == 0);
@@ -261,9 +393,9 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
         int32_t op2_signed = static_cast<int32_t>(op2_register_mult);
 
         int64_t result = (op1_register_mult * op2_register_mult) + 
-            (accumulate * (dst_register_hi << 8 | dst_register_lo));
+            (accumulate * ((dst_register_hi << 8) | dst_register_lo));
 
-        dst_register_hi = (result >> 32) & 0xFFFFFFFF;
+        dst_register_hi = result >> 32;
         dst_register_lo = result & 0xFFFFFFFF;
     }
     else
@@ -271,16 +403,16 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
         uint64_t result = (op1_register_mult * op2_register_mult) + 
             (accumulate * (dst_register_hi << 8 | dst_register_lo));
 
-        dst_register_hi = (result >> 32) & 0xFFFFFFFF;
+        dst_register_hi = result >> 32;
         dst_register_lo = result & 0xFFFFFFFF;
     }
 
     if (set_condition_codes)
     {
-        set_cpsr(ProgramStatusRegsiter::N, dst_register_hi);
+        set_cpsr(ProgramStatusRegsiter::N, dst_register_hi & Utils::MSB32);
         set_cpsr(ProgramStatusRegsiter::Z, dst_register_hi == 0 && dst_register_lo == 0);
         set_cpsr(ProgramStatusRegsiter::C, dst_register_hi < op1_register_mult);
-        
+         
         // skip_mult_instr = true;
     }
 }
@@ -318,6 +450,103 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
         memory.write32(src_register, swap_address);
         dst_register = swap_address_value;
     }
+}
+
+void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
+{
+    assert(Utils::get_bits(opcode, 26, 28) == 0b01);
+
+    bool is_load = Utils::is_bit_set(opcode, 20); // L
+    bool writeback_to_base = Utils::is_bit_set(opcode, 21); // W
+    bool is_byte = Utils::is_bit_set(opcode, 22); // B
+    bool add_to_base = Utils::is_bit_set(opcode, 23); // U
+    bool add_before_transfer = Utils::is_bit_set(opcode, 24); // P
+    bool is_register_offset = Utils::is_bit_set(opcode, 25); // I
+
+    auto [base_register, dst_src_register] = arm_get_rn_rd(opcode);
+
+    uint32_t offset{};
+    if (!is_register_offset)
+        offset = Utils::get_bits(opcode, 0, 12);
+    else
+    {
+        uint32_t op2_register = arm_get_rm(opcode);
+        uint8_t shift_amount{};
+
+        int shift_type = Utils::get_bits(opcode, 5, 7);
+        bool is_register_shift = Utils::is_bit_set(opcode, 4);
+
+        shift_amount = (is_register_offset) ? 
+            arm_get_rs(opcode) : 
+            Utils::get_bits(opcode, 7, 12);
+
+        offset = decode_shift_operation(op2_register, shift_amount, shift_type);
+    }
+
+    int offset_amount = (add_to_base) ? -offset : offset;
+    uint32_t base_address = base_register;
+
+    if (is_byte)
+    {
+        if (is_load)
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                dst_src_register = memory.read8(base_address);
+            }
+            else
+            {
+                dst_src_register = memory.read8(base_address);
+                base_address += offset_amount;
+            }
+        }
+        else 
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                memory.write8(dst_src_register, base_address);
+            }
+            else
+            {
+                memory.write8(dst_src_register, base_address);
+                base_address += offset_amount;
+            }
+        }
+    }
+    else
+    {
+        if (is_load)
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                dst_src_register = memory.read32(base_address);
+            }
+            else
+            {
+                dst_src_register = memory.read32(base_address);
+                base_address += offset_amount;
+            }
+        }
+        else 
+        {
+            if (add_before_transfer) 
+            { 
+                base_address += offset_amount;
+                memory.write32(dst_src_register, base_address);
+            }
+            else
+            {
+                memory.write32(dst_src_register, base_address);
+                base_address += offset_amount;
+            }
+        }
+    }
+
+    if (writeback_to_base)
+        base_register = base_address;
 }
 
 // 2S + 1N Cycles

@@ -37,5 +37,6 @@ int main()
     // GBATests::run_test(cpu, memory, "thumb_ldrh_strh_reg_offset.json");
     // GBATests::run_test(cpu, memory, "thumb_ldrsb_strb_reg_offset.json");
     // GBATests::run_test(cpu, memory, "thumb_ldrsh_ldrsb_reg_offset.json");
+    
     return 0;
 }
