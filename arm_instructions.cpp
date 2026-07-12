@@ -417,6 +417,61 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     }
 }
 
+void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
+{
+    assert(Utils::get_bits(opcode, 26, 28) == 0b00);
+    assert(Utils::get_bits(opcode, 23, 25) == 0b10);
+    assert(!Utils::get_bits(opcode, 19, 21) == 0b01);
+    //  1010001111
+    //  001111xxxx
+
+    bool set_to_spsr = Utils::is_bit_set(opcode, 22);
+    uint32_t& psr = (set_to_spsr) ? get_mode_spsr(mode) : cpsr;
+
+    if (Utils::get_bits(opcode, 16, 22) == 0b001111)
+    {
+        // MRS (transfer PSR contents to a register)
+        int dst_reg_index = Utils::get_bits(opcode, 12, 16);
+        uint32_t& dest_register = *registers[dst_reg_index];
+
+        dest_register = psr;
+        
+        return;
+    }
+    else if (Utils::get_bits(opcode, 12, 22) == 0b1010011111)
+    {
+        // MSR (transfer register contents to PSR)
+        uint32_t src_register = arm_get_rm(opcode); 
+        psr = src_register;
+
+        return;
+    }
+    else if (Utils::get_bits(opcode, 12, 22) == 0b1010001111)
+    {
+        // MSR (transfer register contents or imm val to PSR flag bits)
+        bool is_immediate = Utils::is_bit_set(opcode, 25);
+
+        uint32_t operand{};
+        if (is_immediate)
+        {
+            uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
+            int rotate = Utils::get_bits(opcode, 8, 12);
+            
+            operand = alu_ror(imm8, rotate, false);
+        }
+        else
+            operand = arm_get_rm(opcode);
+
+        // This is probably wrong and I'll fix it soon
+        psr = operand;
+
+        return;
+    }
+
+    std::cout << "Invalid Opcode: " << std::bitset<32>(opcode) << '\n';
+    assert(false);
+}
+
 // 2S + 1N + 1I
 void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 {

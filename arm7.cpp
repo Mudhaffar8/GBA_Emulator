@@ -132,7 +132,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     }
 }
 
-uint32_t Arm7TDMI::get_mode_spsr(CpuMode mode)
+uint32_t& Arm7TDMI::get_mode_spsr(CpuMode mode)
 {
     switch(mode)
     {

@@ -135,7 +135,7 @@ private:
     void handle_mode_switch(uint32_t new_mode);
     void handle_state_switch(CpuState new_state);
 
-    uint32_t get_mode_spsr(CpuMode mode);
+    uint32_t& get_mode_spsr(CpuMode mode);
 
     bool check_condition_code(uint32_t code);
     constexpr void set_cpsr(ProgramStatusRegsiter bit, bool cond) { cpsr = (cond) ? (cpsr | bit) : (cpsr & ~bit); }
@@ -181,6 +181,7 @@ private:
     void arm_halfword_data_transfer(uint32_t opcode);
     void arm_multiply(uint32_t opcode);
     void arm_multiply_long(uint32_t opcode);
+    void arm_psr_transfer(uint32_t opcode);
     void arm_software_interrupt(uint32_t opcode);
     void arm_single_data_swap(uint32_t opcode);
     void arm_single_data_transfer(uint32_t opcode);
