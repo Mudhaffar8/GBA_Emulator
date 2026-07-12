@@ -692,7 +692,7 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
     handle_mode_switch(CpuMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
     get_link() = pc - 2;
-    pc = Arm7VectorAddr::SWI + 8;
+    pc = Arm7VectorAddr::SWI + 4;
     is_branched = true;
 }
 
@@ -748,6 +748,6 @@ void Arm7TDMI::thumb_undefined(uint16_t opcode)
     handle_mode_switch(CpuMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
     get_link() = pc - 2;
-    pc = Arm7VectorAddr::UNDEFINED + 8;
+    pc = Arm7VectorAddr::UNDEFINED + 4;
     is_branched = true;
 }

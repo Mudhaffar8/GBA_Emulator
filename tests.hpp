@@ -142,7 +142,7 @@ public:
                 }
             }
             
-            if (Arm7TDMI::ProgramStatusRegsiter::T == 0)
+            if ((Arm7TDMI::ProgramStatusRegsiter::T & cpu.cpsr) == 0)
             {
                 uint32_t opcode = static_cast<uint32_t>((*it)["opcode"]);
                 cpu.arm_execute(opcode);

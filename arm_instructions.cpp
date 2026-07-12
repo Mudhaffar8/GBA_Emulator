@@ -3,23 +3,26 @@
 // 2S + 1N Incremental Cycles
 void Arm7TDMI::arm_branch(uint32_t opcode)
 {
+    std::cout << "ARM Branch & Branch w/ Link \n";
     assert(Utils::get_bits(opcode, 25, 28) == 0b101);
 
     // Documentation says shift than sign extend but I don't think it makes a difference
-    int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 24) << 2;
-    
-    if (Utils::is_bit_set(opcode, 24)) // Branch with Link
-        get_link() = pc - 2;
+    int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 2;
 
+    if (Utils::is_bit_set(opcode, 24)) // Branch with Link
+        get_link() = pc - 4;
+    
     // The branch offset must take account of the prefetch operation, 
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
-    pc += (sign_extended_offset) + 4;
+    pc += sign_extended_offset + 8;
     is_branched = true;
 }
 
 // 2S + 1N Cycles
 void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
 {
+    std::cout << "ARM Branch And Exchange\n";
+
     assert(Utils::get_bits(opcode, 4, 28) == 0b0001'0010'1111'1111'1111'0001);
 
     // If R15 is used as an operand, the behaviour is undefined.
@@ -32,23 +35,31 @@ void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
 // Unused as GBA has no coprocessors
 void Arm7TDMI::arm_coprocessor_data_operation(uint32_t opcode) 
 {
+    std::cout << "ARM Coprocessor Data Operation\n";
+
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(!Utils::is_bit_set(opcode, 4));
 }
 
 void Arm7TDMI::arm_coprocessor_data_transfer(uint32_t opcode) 
 {
+    std::cout << "ARM Coprocessor Data Transfer\n";
+    
     assert(Utils::get_bits(opcode, 25, 28) == 0b110);
 }
 
 void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode) 
 {
+    std::cout << "ARM Coprocessor Register Transfer\n";
+
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(Utils::is_bit_set(opcode, 4));
 }
 
 void Arm7TDMI::arm_data_processing(uint32_t opcode)
 {
+    std::cout << "ARM Data Processing\n";
+
     assert(Utils::get_bits(opcode, 26, 28) == 0b00);
 
     auto [op1_register, dst_register] = arm_get_rn_rd(opcode);
@@ -139,6 +150,8 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
 
 void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 {
+    std::cout << "ARM Block Data Transfer\n";
+
     // This instruction is going to break me :sob:
     // It'd be a good idea to break this into seperate instructions
     assert(Utils::get_bits(opcode, 25, 28) == 0b100);
@@ -235,6 +248,8 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
 void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 {
+    std::cout << "ARM Halfword Data Transfer\n";
+
     assert(Utils::get_bits(opcode, 25, 28) == 0);
     assert(Utils::get_bits(opcode, 7, 12) == 1);
     assert(Utils::is_bit_set(opcode, 4));
@@ -353,6 +368,8 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 
 void Arm7TDMI::arm_multiply(uint32_t opcode)
 {
+    std::cout << "ARM Multiply\n";
+
     assert(Utils::get_bits(opcode, 22, 28) == 0);
     assert(Utils::get_bits(opcode, 4, 8) == 0b1001);
 
@@ -376,6 +393,8 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
 
 void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 {
+    std::cout << "ARM Multiply Long\n";
+
     assert(Utils::get_bits(opcode, 23, 28) == 1);
     assert(Utils::get_bits(opcode, 4, 8) == 0b1001);
 
@@ -419,6 +438,8 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 
 void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 {
+    std::cout << "ARM PSR Transfer\n";
+
     assert(Utils::get_bits(opcode, 26, 28) == 0b00);
     assert(Utils::get_bits(opcode, 23, 25) == 0b10);
     assert(!Utils::get_bits(opcode, 19, 21) == 0b01);
@@ -474,6 +495,8 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 // 2S + 1N + 1I
 void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 {
+    std::cout << "ARM Single Data Swap\n";
+
     assert(Utils::get_bits(opcode, 23, 28) == 0b00010);
     assert(Utils::get_bits(opcode, 20, 22) == 0b00);
     assert(Utils::get_bits(opcode, 8, 12) == 0b0000);
@@ -508,6 +531,8 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 
 void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 {
+    std::cout << "ARM Single Data Transfer\n";
+
     assert(Utils::get_bits(opcode, 26, 28) == 0b01);
 
     bool is_load = Utils::is_bit_set(opcode, 20); // L
@@ -606,6 +631,8 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 // 2S + 1N Cycles
 void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
 {
+    std::cout << "ARM Software Interrupt\n";
+
     assert(Utils::get_bits(opcode, 24, 28) == 0b1111);
 
     /// @note The bottom 24 bits of the instruction are ignored by the processor
@@ -621,6 +648,8 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
 // 2S + 1I + 1N cycles
 void Arm7TDMI::arm_undefined(uint32_t opcode)
 {
+    std::cout << "ARM Undefined\n";
+
     assert(Utils::get_bits(opcode, 25, 28) == 0b011);
     assert(Utils::is_bit_set(opcode, 4));
 

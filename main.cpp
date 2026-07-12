@@ -10,7 +10,9 @@ int main()
     FakeMemory memory;
     Arm7TDMI cpu(memory);
 
-    // GBATests::run_test(cpu, memory, "arm_b_bl.json");
+    GBATests::run_test(cpu, memory, "arm_b_bl.json");
+    GBATests::run_test(cpu, memory, "arm_bx.json");
+    GBATests::run_test(cpu, memory, "arm_swi.json");
 
     // Passes all THUMB Tests
     // GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");

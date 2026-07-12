@@ -51,7 +51,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     cpsr &= ~ProgramStatusRegsiter::Mode;
     cpsr |= new_mode;
 
-    // std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
+    std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
 
     switch(new_mode)
     {
@@ -146,6 +146,8 @@ uint32_t& Arm7TDMI::get_mode_spsr(CpuMode mode)
     case CpuMode::InterruptRequest: return spsr_irq;
     case CpuMode::Undefined: return spsr_und;
     }
+
+    return cpsr;
 }
 
 void Arm7TDMI::handle_state_switch(CpuState new_state)
@@ -186,7 +188,8 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
     uint32_t condition_code = Utils::get_bits(opcode, 28, 32);
     if (check_condition_code(condition_code))
     {
-        int index = (Utils::get_bits(opcode, 20, 28) << 8) | Utils::get_bits(opcode, 4, 8);
+        int index = (Utils::get_bits(opcode, 20, 28) << 4) | Utils::get_bits(opcode, 4, 8);
+        std::cout << "Index: " << std::bitset<12>(index) << '\n';
         (this->*arm_instr_table[index])(opcode);
     }
 
@@ -221,7 +224,7 @@ std::array<Arm7TDMI::ArmFunc, 4096> Arm7TDMI::generate_arm_table()
             // Data Processing and MSR
 
             // Filters out multply and multiply long
-            if (bits_20_to_24 & 0x100)
+            if (bits_20_to_24 & 0b10000)
             {
                 if ((bits_20_to_24 & 0b11011) == 0b10000 && bits_4_to_7 == 0b1001)
                     table[i] = &arm_single_data_swap;
@@ -274,7 +277,7 @@ std::array<Arm7TDMI::ArmFunc, 4096> Arm7TDMI::generate_arm_table()
             break;
 
         case 0b111:
-            if (bits_20_to_24 & 0x100)
+            if (bits_20_to_24 & 0b10000)
                 table[i] = &arm_software_interrupt;
             else
             {
