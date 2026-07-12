@@ -207,6 +207,84 @@ std::array<Arm7TDMI::ArmFunc, 4096> Arm7TDMI::generate_arm_table()
 {
     // Bits 20-27 and bits 4-7 should be enough to decode the instruction
     std::array<ArmFunc, 4096> table{};
+    for (int i = 0; i < 4096; ++i)
+    {
+        int bits_25_to_27 = Utils::get_bits(i, 9, 12);
+        int bits_20_to_24 = Utils::get_bits(i, 4, 9);
+        int bits_4_to_7 = Utils::get_bits(i, 0, 4);
+
+        switch(bits_25_to_27)
+        {
+        case 0b000:
+            // Rd in data Processing cannot be 15
+            // Rd == 15 can be an easy way to differentiate from 
+            // Data Processing and MSR
+
+            // Filters out multply and multiply long
+            if (bits_20_to_24 & 0x100)
+            {
+                if ((bits_20_to_24 & 0b11011) == 0b10000 && bits_4_to_7 == 0b1001)
+                    table[i] = &arm_single_data_swap;
+                else if (bits_20_to_24 == 0b10010 && bits_4_to_7 == 0b0001)
+                    table[i] = &arm_branch_and_exchange;
+                else if ((bits_4_to_7 & 0b1001) == 0b1001)
+                    table[i] = &arm_halfword_data_transfer;
+                else  
+                    table[i] = &arm_data_processing;
+            }
+            else
+            {
+                if ((bits_20_to_24 & 0b11100) == 0 && bits_4_to_7 == 0b1001)
+                    table[i] = &arm_multiply;
+                else if ((bits_20_to_24 & 0b11100) == 0b01000 && bits_4_to_7 == 0b1001)
+                    table[i] = &arm_multiply_long;
+                else if ((bits_4_to_7 & 0b1001) == 0b1001)
+                    table[i] = &arm_halfword_data_transfer;
+                // When bits[27:24] == 0b000, then register w/ shift
+                // Either bit 4 is set and bit 7 is unset or bit 4 is unset for data processing
+                else 
+                    table[i] = &arm_data_processing;
+            }
+            break;
+
+        case 0b001:
+            table[i] = &arm_data_processing;
+            break;
+
+        case 0b010:
+            table[i] = &arm_single_data_transfer;
+            break;
+
+        case 0b011:
+            table[i] = (bits_4_to_7 & 1) ? 
+                &arm_undefined : 
+                &arm_single_data_transfer;
+            break;
+
+        case 0b100:
+            table[i] = &arm_block_data_transfer; 
+            break;
+        
+        case 0b101:
+            table[i] = &arm_branch;
+            break;
+        
+        case 0b110:
+            table[i] = &arm_coprocessor_data_transfer;
+            break;
+
+        case 0b111:
+            if (bits_20_to_24 & 0x100)
+                table[i] = &arm_software_interrupt;
+            else
+            {
+                table[i] = (bits_4_to_7 & 1) ?
+                    &arm_coprocessor_register_transfer :
+                    &arm_coprocessor_data_operation;
+            }
+            break;
+        }
+    }
     return table;
 }
 

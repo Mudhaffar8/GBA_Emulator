@@ -186,7 +186,7 @@ public:
             check_val(cpu.r13_und, static_cast<uint32_t>((*it)["final"]["R_und"][0]), "R13 UND");
             check_val(cpu.r14_und, static_cast<uint32_t>((*it)["final"]["R_und"][1]), "R14 UND");
 
-            if (!cpu.skip_mult_instr) // Skipping Multiplication instructions cuz the carry flag is BS
+            if (!cpu.skip_mult_instr) // Skipping for multiplication instructions cuz the carry flag is BS
                 check_val<uint32_t, true>(cpu.cpsr, static_cast<uint32_t>((*it)["final"]["CPSR"]), "CPSR");
             check_val<uint32_t, true>(cpu.spsr_fiq, static_cast<uint32_t>((*it)["final"]["SPSR"][0]), "SPSR FIQ");
             check_val<uint32_t, true>(cpu.spsr_svc, static_cast<uint32_t>((*it)["final"]["SPSR"][1]), "SPSR SVC");

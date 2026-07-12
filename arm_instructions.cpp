@@ -462,8 +462,7 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
         else
             operand = arm_get_rm(opcode);
 
-        // This is probably wrong and I'll fix it soon
-        psr = operand;
+        psr = operand << 24;
 
         return;
     }
@@ -614,7 +613,7 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
-    get_link() = pc - 2;
+    get_link() = pc - 4;
     pc = Arm7VectorAddr::SWI + 8;
     is_branched = true;
 }
@@ -629,7 +628,7 @@ void Arm7TDMI::arm_undefined(uint32_t opcode)
     handle_state_switch(CpuState::Arm);
     handle_mode_switch(CpuMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
-    get_link() = pc - 2;
+    get_link() = pc - 4;
     pc = Arm7VectorAddr::UNDEFINED + 8;
     is_branched = true;
 }
