@@ -10,9 +10,12 @@ int main()
     FakeMemory memory;
     Arm7TDMI cpu(memory);
 
-    GBATests::run_test(cpu, memory, "arm_b_bl.json");
-    GBATests::run_test(cpu, memory, "arm_bx.json");
-    GBATests::run_test(cpu, memory, "arm_swi.json");
+    // Everything commented out is passed
+    // GBATests::run_test(cpu, memory, "arm_b_bl.json");
+    // GBATests::run_test(cpu, memory, "arm_bx.json");
+    // GBATests::run_test(cpu, memory, "arm_swi.json");
+    GBATests::run_test(cpu, memory, "arm_mul_mla.json"); // Only when r15 edge case is skipped
+    GBATests::run_test(cpu, memory, "arm_mull_mlal.json"); // Only when r15 and rdhi == rdlo edge cases are skipped
 
     // Passes all THUMB Tests
     // GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");

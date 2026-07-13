@@ -57,6 +57,7 @@ public:
 
     void write8(uint8_t byte, uint32_t address) 
     {
+        std::cout << "Wrote byte " << std::dec << +byte << " @ " << address << '\n';
         memory.insert_or_assign(address, byte);
     }
 

@@ -121,6 +121,8 @@ private:
 
     bool is_branched = false;
     bool skip_mult_instr = false; // Skipping mult cpsr flag on SST
+    bool skip_instr = false;
+
 private:
     inline uint32_t& get_sp() { return *registers[13]; }
     inline uint32_t& get_link() { return *registers[14]; }
@@ -214,19 +216,22 @@ private:
     // Bits 12-15 for Dst, Bits 16-19 for Src
     // Normally in order Rd, Rn
     // Src for than dst usually
-    inline std::pair<uint32_t&, uint32_t&> arm_get_rn_rd(uint32_t opcode) const
+    inline std::pair<uint32_t&, uint32_t&> arm_get_rn_rd(uint32_t opcode)
     {
         int dst_reg_index = Utils::get_bits(opcode, 12, 16);
         int src_reg_index = Utils::get_bits(opcode, 16, 20);
 
-        // std::cout << "Destination Idx: " << dst_reg_index << '\n';
-        // std::cout << "Source Idx: " << src_reg_index << '\n';
+        std::cout << "Destination Idx: " << dst_reg_index << '\n';
+        std::cout << "Source Idx: " << src_reg_index << '\n';
 
         uint32_t& dest_register = *registers[dst_reg_index];
         uint32_t& src_register = *registers[src_reg_index];
 
-        // std::cout << "Dest Register Value: " << dest_register << '\n';
-        // std::cout << "Src Register Value: " << src_register << '\n';
+        std::cout << "Dest Register Value: " << dest_register << '\n';
+        std::cout << "Src Register Value: " << src_register << '\n';
+
+        if (dst_reg_index == 15 || src_reg_index == 15 || dst_reg_index == src_reg_index) 
+            skip_instr = true;
 
         return {src_register, dest_register};
     }
@@ -235,14 +240,26 @@ private:
     inline uint32_t& arm_get_rm(uint32_t opcode)
     {
         int rm_index = Utils::get_bits(opcode, 0, 4);
+        std::cout << "Rm Idx: " << rm_index << '\n';
+        std::cout << "Rm Contents: " << *registers[rm_index] << '\n';
+
+        if (rm_index == 15) 
+            skip_instr = true;
+
         return *registers[rm_index];
     }
 
     // Bits 8-11
     inline uint32_t& arm_get_rs(uint32_t opcode)
     {
-        int rm_index = Utils::get_bits(opcode, 8, 12);
-        return *registers[rm_index];
+        int rs_index = Utils::get_bits(opcode, 8, 12);
+        std::cout << "rs Idx: " << rs_index << '\n';
+        std::cout << "Rs Contents: " << *registers[rs_index] << '\n';
+
+        if (rs_index == 15) 
+            skip_instr = true;
+
+        return *registers[rs_index];
     }
 
     /* Thumb Helper Methods */

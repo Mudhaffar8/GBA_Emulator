@@ -239,7 +239,7 @@ std::array<Arm7TDMI::ArmFunc, 4096> Arm7TDMI::generate_arm_table()
             {
                 if ((bits_20_to_24 & 0b11100) == 0 && bits_4_to_7 == 0b1001)
                     table[i] = &arm_multiply;
-                else if ((bits_20_to_24 & 0b11100) == 0b01000 && bits_4_to_7 == 0b1001)
+                else if ((bits_20_to_24 & 0b11000) == 0b01000 && bits_4_to_7 == 0b1001)
                     table[i] = &arm_multiply_long;
                 else if ((bits_4_to_7 & 0b1001) == 0b1001)
                     table[i] = &arm_halfword_data_transfer;

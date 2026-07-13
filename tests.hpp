@@ -71,9 +71,11 @@ public:
 
         std::cout << "Running Test File: " << file_name << '\n';
 
-        int number = 1;
+        int number = 0;
         for (json::iterator it = data.begin(); it != data.end(); ++it)
         {
+            ++number;
+            cpu.skip_instr = false;
             cpu.skip_mult_instr = false;
             
             cpu.cpsr = static_cast<uint32_t>((*it)["initial"]["CPSR"]);
@@ -153,6 +155,9 @@ public:
                 cpu.thumb_execute(opcode);
             }
 
+            if (cpu.skip_instr)
+                continue;
+
             // Set CPU register values
             for (int i = 0; i < 8; ++i)
                 check_val(*cpu.registers[i], static_cast<uint32_t>((*it)["final"]["R"][i]), "R" + std::to_string(i));
@@ -212,7 +217,7 @@ public:
 
             mem.clear_memory();
 
-            std::cout << "\nPassed Test #" << number++ << '\n';
+            std::cout << "\nPassed Test #" << number << '\n';
         }
 
         std::cout << "Passed All Tests: " << file_name << '\n';

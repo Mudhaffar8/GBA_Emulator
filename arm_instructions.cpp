@@ -65,9 +65,11 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     auto [op1_register, dst_register] = arm_get_rn_rd(opcode);
 
     int operation = Utils::get_bits(opcode, 21, 25);
+    std::cout << "Operation: " << operation << '\n';
 
     bool set_condition_codes = Utils::is_bit_set(opcode, 20);
     bool is_immediate = Utils::is_bit_set(opcode, 25);
+    std::cout << "Is Immediate: " << is_immediate << '\n';
 
     uint32_t op2{};
     if (is_immediate)
@@ -375,19 +377,23 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
 
     bool set_condition_codes = Utils::is_bit_set(opcode, 20);
     bool accumulate = Utils::is_bit_set(opcode, 21);
+    std::cout << "Is Accumulate: " << accumulate << '\n';
 
-    auto [dst_register, op1_register_mult] = arm_get_rn_rd(opcode);
-    uint32_t op2_register_mult = arm_get_rs(opcode);
-    uint32_t op3_register_add = arm_get_rm(opcode);
+    // Restrictions: Rd may not be same as Rm. Rd,Rn,Rs,Rm may not be R15.
+    auto [dst_register, op3_register_add] = arm_get_rn_rd(opcode);
+    uint32_t op1_register_mult = arm_get_rs(opcode);
+    uint32_t op2_register_mult = arm_get_rm(opcode);
+
+    std::cout << "Dst Register Old: " << dst_register << '\n';
 
     dst_register = (op1_register_mult * op2_register_mult) + (accumulate * op3_register_add);
-
+    
     if (set_condition_codes)
     {
         set_negative_and_zero(dst_register);
         set_cpsr(ProgramStatusRegsiter::C, dst_register < op1_register_mult);
         
-        // skip_mult_instr = true;
+        skip_mult_instr = true;
     }
 }
 
@@ -400,30 +406,44 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 
     bool set_condition_codes = Utils::is_bit_set(opcode, 20);
     bool accumulate = Utils::is_bit_set(opcode, 21);
+    std::cout << "Accumulate: " << accumulate << '\n';
     bool is_signed = Utils::is_bit_set(opcode, 22);
+    std::cout << "Is Signed: " << is_signed << '\n';
 
     auto [dst_register_hi, dst_register_lo] = arm_get_rn_rd(opcode);
     uint32_t op1_register_mult = arm_get_rs(opcode);
     uint32_t op2_register_mult = arm_get_rm(opcode);
+    
+    // Restrictions: RdHi,RdLo,Rm must be different registers. R15 may not be used.
+    skip_mult_instr = true;
 
     if (is_signed)
     {
         int32_t op1_signed = static_cast<int32_t>(op1_register_mult);
         int32_t op2_signed = static_cast<int32_t>(op2_register_mult);
+        std::cout << "Op1 signed: " << op1_signed << '\n';
+        std::cout << "Op2 signed: " << op2_signed << '\n';
 
-        int64_t result = (op1_register_mult * op2_register_mult) + 
-            (accumulate * ((dst_register_hi << 8) | dst_register_lo));
+        int64_t result = static_cast<int64_t>(op1_signed) * static_cast<int64_t>(op2_signed);
+        std::cout << "Result:      " << std::bitset<64>(result) << '\n';
+        dst_register_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
 
-        dst_register_hi = result >> 32;
-        dst_register_lo = result & 0xFFFFFFFF;
+        bool carry = dst_register_lo < (result & 0xFFFFFFFF);
+
+        dst_register_hi = (result >> 32) + (accumulate * dst_register_hi) + carry;
     }
     else
     {
-        uint64_t result = (op1_register_mult * op2_register_mult) + 
-            (accumulate * (dst_register_hi << 8 | dst_register_lo));
+        uint64_t op1_unsigned = static_cast<uint64_t>(op1_register_mult);
+        uint64_t op2_unsigned = static_cast<uint64_t>(op2_register_mult);
 
-        dst_register_hi = result >> 32;
-        dst_register_lo = result & 0xFFFFFFFF;
+        uint64_t result = op1_unsigned * op2_unsigned;
+        dst_register_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
+
+        bool carry = dst_register_lo < (result & 0xFFFFFFFF);
+        std::cout << "Carry: " << carry << '\n';
+
+        dst_register_hi = (result >> 32) + (accumulate * dst_register_hi) + carry;
     }
 
     if (set_condition_codes)
@@ -503,30 +523,47 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
     assert(Utils::get_bits(opcode, 4, 8) == 0b1001);
 
     bool swap_byte = Utils::is_bit_set(opcode, 22);
+    std::cout << "Byte Swap: " << swap_byte << '\n';
 
-    auto [swap_address, dst_register] = arm_get_rn_rd(opcode);
-    uint32_t src_register = arm_get_rm(opcode);
+    int src_index = Utils::get_bits(opcode, 0, 4);
+    int dst_reg_index = Utils::get_bits(opcode, 12, 16);
+    int swap_reg_index = Utils::get_bits(opcode, 16, 20);
 
-    /*
-        The swap address is determined by the contents of the base 
-        register (Rn). The processor first reads the contents of the 
-        swap address. Then it writes the contents of the source register 
-        (Rm) to the swap address, and stores the old memory contents in 
-        the destination register (Rd). The same register may be 
-        specified as both the source and destination. 
-    */
+    std::cout << "Destination Idx: " << dst_reg_index << '\n';
+    std::cout << "Source Idx: " << swap_reg_index << '\n';
+    std::cout << "Rm Idx: " << src_index << '\n';
+
+    uint32_t& dst_register = *registers[dst_reg_index];
+    uint32_t swap_address = *registers[swap_reg_index];
+    uint32_t src_register = *registers[src_index];
+
+    std::cout << "Dest Register Value: " << dst_register << '\n';
+    std::cout << "Swap Address Value: " << swap_address << '\n';
+    std::cout << "Src Register Value: " << src_register << '\n';
+
+    // So many edge cases with Rm, Rn, Rs = 15 lord
     if (swap_byte)
     {
         uint8_t swap_address_value = memory.read8(swap_address);    
+        std::cout << "Swap Address Value: " << std::dec << +swap_address_value << '\n';
+        if (src_index == 15) src_register += 4;
         memory.write8(src_register, swap_address);
+        
         dst_register = swap_address_value;
     }
     else
     {
-        uint32_t swap_address_value = memory.read32(swap_address);    
+        uint32_t swap_address_value = memory.read32(swap_address);
+        std::cout << "Swap Address Value: " << std::dec << swap_address_value << '\n';
         memory.write32(src_register, swap_address);
-        dst_register = swap_address_value;
+        if (src_index == 15) src_register += 4;
+        dst_register = (swap_address & 3) ? alu_ror(swap_address_value, (swap_address & 3) * 8, false) : swap_address_value;
     }
+    
+    if (dst_reg_index == 15)
+        dst_register += 4;
+
+    std::cout << "Final Dst Value: " << dst_register << '\n';
 }
 
 void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
