@@ -230,9 +230,6 @@ private:
         std::cout << "Dest Register Value: " << dest_register << '\n';
         std::cout << "Src Register Value: " << src_register << '\n';
 
-        if (dst_reg_index == 15 || src_reg_index == 15 || dst_reg_index == src_reg_index) 
-            skip_instr = true;
-
         return {src_register, dest_register};
     }
     
@@ -242,10 +239,6 @@ private:
         int rm_index = Utils::get_bits(opcode, 0, 4);
         std::cout << "Rm Idx: " << rm_index << '\n';
         std::cout << "Rm Contents: " << *registers[rm_index] << '\n';
-
-        if (rm_index == 15) 
-            skip_instr = true;
-
         return *registers[rm_index];
     }
 
@@ -255,10 +248,6 @@ private:
         int rs_index = Utils::get_bits(opcode, 8, 12);
         std::cout << "rs Idx: " << rs_index << '\n';
         std::cout << "Rs Contents: " << *registers[rs_index] << '\n';
-
-        if (rs_index == 15) 
-            skip_instr = true;
-
         return *registers[rs_index];
     }
 

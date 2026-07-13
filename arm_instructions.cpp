@@ -380,13 +380,32 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
     std::cout << "Is Accumulate: " << accumulate << '\n';
 
     // Restrictions: Rd may not be same as Rm. Rd,Rn,Rs,Rm may not be R15.
-    auto [dst_register, op3_register_add] = arm_get_rn_rd(opcode);
-    uint32_t op1_register_mult = arm_get_rs(opcode);
-    uint32_t op2_register_mult = arm_get_rm(opcode);
+    int op3_add_index = Utils::get_bits(opcode, 12, 16);
+    int dst_reg_index = Utils::get_bits(opcode, 16, 20);
+
+    std::cout << "Destination Idx: " << dst_reg_index << '\n';
+    std::cout << "Op3 Idx: " << op3_add_index << '\n';
+
+    uint32_t& dst_register = *registers[dst_reg_index];
+    uint32_t& op3_register_add = *registers[op3_add_index];
+
+    std::cout << "Dest Register Value: " << dst_register << '\n';
+    std::cout << "Op3 Add Register Value: " << op3_register_add << '\n';
+
+    uint32_t& op1_register_mult = arm_get_rs(opcode);
+    uint32_t& op2_register_mult = arm_get_rm(opcode);
 
     std::cout << "Dst Register Old: " << dst_register << '\n';
 
-    dst_register = (op1_register_mult * op2_register_mult) + (accumulate * op3_register_add);
+    pc += 4;
+    is_branched = true;
+
+    uint32_t result = (op1_register_mult * op2_register_mult) + (accumulate * op3_register_add);
+    if (dst_reg_index == 15)
+        pc = result + 8;
+    else 
+        dst_register = result;
+
     
     if (set_condition_codes)
     {
@@ -410,12 +429,25 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     bool is_signed = Utils::is_bit_set(opcode, 22);
     std::cout << "Is Signed: " << is_signed << '\n';
 
-    auto [dst_register_hi, dst_register_lo] = arm_get_rn_rd(opcode);
-    uint32_t op1_register_mult = arm_get_rs(opcode);
-    uint32_t op2_register_mult = arm_get_rm(opcode);
-    
-    // Restrictions: RdHi,RdLo,Rm must be different registers. R15 may not be used.
-    skip_mult_instr = true;
+    int dst_lo_index = Utils::get_bits(opcode, 12, 16);
+    int dst_hi_index = Utils::get_bits(opcode, 16, 20);
+
+    std::cout << "Dst Hi Idx: " << dst_hi_index << '\n';
+    std::cout << "Dst Lo Idx: " << dst_lo_index << '\n';
+
+    uint32_t& dst_register_hi = *registers[dst_hi_index];
+    uint32_t& dst_register_lo = *registers[dst_lo_index];
+
+    std::cout << "Dest Register Hi: " << dst_register_hi << '\n';
+    std::cout << "Dest Register Lo: " << dst_register_lo << '\n';
+
+    uint32_t& op1_register_mult = arm_get_rs(opcode);
+    uint32_t& op2_register_mult = arm_get_rm(opcode);
+
+    uint32_t result_lo{}, result_hi{};
+
+    pc += 4;
+    is_branched = true;
 
     if (is_signed)
     {
@@ -426,11 +458,11 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 
         int64_t result = static_cast<int64_t>(op1_signed) * static_cast<int64_t>(op2_signed);
         std::cout << "Result:      " << std::bitset<64>(result) << '\n';
-        dst_register_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
+        result_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
 
-        bool carry = dst_register_lo < (result & 0xFFFFFFFF);
+        bool carry = result_lo < (result & 0xFFFFFFFF);
 
-        dst_register_hi = (result >> 32) + (accumulate * dst_register_hi) + carry;
+        result_hi = (result >> 32) + (accumulate * dst_register_hi) + carry;
     }
     else
     {
@@ -438,13 +470,19 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
         uint64_t op2_unsigned = static_cast<uint64_t>(op2_register_mult);
 
         uint64_t result = op1_unsigned * op2_unsigned;
-        dst_register_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
+        result_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
 
-        bool carry = dst_register_lo < (result & 0xFFFFFFFF);
+        bool carry = result_lo < (result & 0xFFFFFFFF);
         std::cout << "Carry: " << carry << '\n';
 
-        dst_register_hi = (result >> 32) + (accumulate * dst_register_hi) + carry;
+        result_hi = (result >> 32) + (accumulate * dst_register_hi) + carry;
     }
+
+    dst_register_lo = result_lo;
+    dst_register_hi = result_hi;
+
+    if (dst_hi_index == 15 || dst_lo_index == 15)
+        pc += 8;
 
     if (set_condition_codes)
     {
@@ -452,7 +490,7 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
         set_cpsr(ProgramStatusRegsiter::Z, dst_register_hi == 0 && dst_register_lo == 0);
         set_cpsr(ProgramStatusRegsiter::C, dst_register_hi < op1_register_mult);
          
-        // skip_mult_instr = true;
+        skip_mult_instr = true;
     }
 }
 

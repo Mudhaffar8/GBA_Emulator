@@ -75,7 +75,6 @@ public:
         for (json::iterator it = data.begin(); it != data.end(); ++it)
         {
             ++number;
-            cpu.skip_instr = false;
             cpu.skip_mult_instr = false;
             
             cpu.cpsr = static_cast<uint32_t>((*it)["initial"]["CPSR"]);
@@ -154,9 +153,6 @@ public:
                 uint16_t opcode = static_cast<uint16_t>((*it)["opcode"]);
                 cpu.thumb_execute(opcode);
             }
-
-            if (cpu.skip_instr)
-                continue;
 
             // Set CPU register values
             for (int i = 0; i < 8; ++i)
