@@ -51,13 +51,15 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     cpsr &= ~ProgramStatusRegsiter::Mode;
     cpsr |= new_mode;
 
+    mode = static_cast<CpuMode>(new_mode);
+
     std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
 
     switch(new_mode)
     {
     case CpuMode::User:
     case CpuMode::System:
-        // std::cout << "USER/SYSTEM\n";
+        std::cout << "USER/SYSTEM\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -68,7 +70,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::FastInterrupt:
-        // std::cout << "FIQ\n";
+        std::cout << "FIQ\n";
         registers[8] = &r8_fiq;
         registers[9] = &r9_fiq;
         registers[10] = &r10_fiq;
@@ -79,7 +81,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::InterruptRequest:
-        // std::cout << "IRQ\n";
+        std::cout << "IRQ\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -91,7 +93,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::Supervisor:
-        // std::cout << "SVC\n";
+        std::cout << "SVC\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -103,7 +105,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::Abort:
-        // std::cout << "ABT\n";
+        std::cout << "ABT\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -115,7 +117,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case CpuMode::Undefined:
-        // std::cout << "UND\n";
+        std::cout << "UND\n";
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;

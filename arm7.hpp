@@ -20,7 +20,6 @@ namespace Arm7VectorAddr
     const uint32_t RESERVED = 0x14;
     const uint32_t IRQ = 0x18;
     const uint32_t FIQ = 0x1C;
-
 }
 
 class Arm7TDMI 
@@ -165,7 +164,7 @@ private:
     uint32_t alu_lsl(uint32_t op1, uint32_t op2, bool set_cc); // Logical Shift Left
     uint32_t alu_lsr(uint32_t op1,uint32_t op2, bool set_cc); // Logical Shift Right
     uint32_t alu_asr(uint32_t op1, uint32_t op2, bool set_cc);
-    uint32_t alu_ror(uint32_t op1, uint32_t op2, bool set_cc);
+    uint32_t alu_ror(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry = true);
     uint32_t alu_mul(uint32_t op1, uint32_t op2, bool set_cc);
     uint32_t decode_shift_operation(uint32_t op1, uint32_t op2, int shift_type);
 

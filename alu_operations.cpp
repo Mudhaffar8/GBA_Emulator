@@ -105,6 +105,7 @@ uint32_t Arm7TDMI::alu_orr(uint32_t op1, uint32_t op2, bool set_cc)
 
 uint32_t Arm7TDMI::alu_sbc(uint32_t op1, uint32_t op2, bool set_cc) 
 { 
+    std::cout << "Carry: " << c_set() << '\n';
     uint32_t result = op1 - op2 - !c_set();
     if (set_cc)
     {
@@ -188,7 +189,7 @@ uint32_t Arm7TDMI::alu_asr(uint32_t op1, uint32_t op2, bool set_cc)
     return result;
 }
 
-uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc)
+uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry)
 {
     /* 
         if Rs[7:0] == 0 then
@@ -209,23 +210,23 @@ uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc)
     {}
     else
     {
-        std::cout << "Old Val: " << std::bitset<32>(op1) << '\n';
+        // std::cout << "Old Val: " << std::bitset<32>(op1) << '\n';
 
         uint8_t rotate_amount = Utils::get_bits(op2, 0, 5);
-        std::cout << "Rotate Amount: " << +rotate_amount << '\n';
+        // std::cout << "Rotate Amount: " << +rotate_amount << '\n';
         
-        if (set_cc)
+        if (set_cc && set_carry)
             set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, rotate_amount - 1));
 
         uint32_t bits_shifted_out = Utils::get_bits(op1, 0, rotate_amount);
-        std::cout << "Bits Shifted Out: " << std::bitset<32>(bits_shifted_out) << '\n';
+        // std::cout << "Bits Shifted Out: " << std::bitset<32>(bits_shifted_out) << '\n';
 
         result >>= rotate_amount;
-        std::cout << "Bit Shifted Val: " << result << '\n';
+        // std::cout << "Bit Shifted Val: " << result << '\n';
 
         result |= (bits_shifted_out << (32 - rotate_amount)); 
 
-        std::cout << "New Val: " << std::bitset<32>(result) << '\n';
+        // std::cout << "New Val: " << std::bitset<32>(result) << '\n';
     }
     if (set_cc)
         set_negative_and_zero(result);

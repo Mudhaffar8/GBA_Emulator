@@ -1,5 +1,26 @@
 #include "arm7.hpp"
 
+enum AluOps 
+{
+    And = 0b0000,
+    Eor = 0b0001,
+    Sub = 0b0010,
+    Rsb = 0b0011,
+    Add = 0b0100,
+    Adc = 0b0101,
+    Sbc = 0b0110,
+    Rsc = 0b0111,
+    Tst = 0b1000,
+    Teq = 0b1001,
+    Cmp = 0b1010,
+    Cmn = 0b1011,
+    Orr = 0b1100,
+    Mov = 0b1101,
+    Bic = 0b1110,
+    Mvn = 0b1111
+};
+
+
 // 2S + 1N Incremental Cycles
 void Arm7TDMI::arm_branch(uint32_t opcode)
 {
@@ -62,7 +83,17 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
 
     assert(Utils::get_bits(opcode, 26, 28) == 0b00);
 
-    auto [op1_register, dst_register] = arm_get_rn_rd(opcode);
+    int dst_reg_index = Utils::get_bits(opcode, 12, 16);
+    int src_reg_index = Utils::get_bits(opcode, 16, 20);
+
+    std::cout << "Destination Idx: " << dst_reg_index << '\n';
+    std::cout << "Source Idx: " << src_reg_index << '\n';
+
+    uint32_t& dst_register = *registers[dst_reg_index];
+    uint32_t& op1_register = *registers[src_reg_index];
+
+    std::cout << "Dest Register Value: " << dst_register << '\n';
+    std::cout << "Src Register Value: " << op1_register << '\n';
 
     int operation = Utils::get_bits(opcode, 21, 25);
     std::cout << "Operation: " << operation << '\n';
@@ -71,20 +102,39 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     bool is_immediate = Utils::is_bit_set(opcode, 25);
     std::cout << "Is Immediate: " << is_immediate << '\n';
 
+    /*
+        If R15 (the PC) is used as an operand in a data processing 
+        instruction the register is used directly. 
+
+        The PC value will be the address of the instruction, 
+        plus 8 or 12 bytes due to instruction prefetching. If the shift 
+        amount is specified in the instruction, the PC will be 8 bytes 
+        ahead. If a register is used to specify the shift amount the 
+        PC will be 12 bytes ahead
+
+        For once Rd = PC is well-defined.
+    */
     uint32_t op2{};
     if (is_immediate)
     {
         uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
+        std::cout << "imm8: " << imm8 << '\n';
         int shift = Utils::get_bits(opcode, 8, 12);
+        std::cout << "Shift: " << shift << '\n';
 
-        op2 = alu_lsl(imm8, shift, set_condition_codes);
+        // Either the CC set after alu_ror are wrong (carry should not be set)
+        // Or, the CC should not be touched for certain instructions?
+        bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
+        op2 = alu_ror(imm8, shift * 2, set_condition_codes, !is_arithmetic);
     }
     else 
     {
         uint32_t op2_register = arm_get_rm(opcode);
         uint8_t shift_amount{};
+        std::cout << "Shift Amount: " << shift_amount << '\n';
 
         int shift_type = Utils::get_bits(opcode, 5, 7);
+        std::cout << "Shift Type: " << shift_type << '\n';
         bool is_register_shift = Utils::is_bit_set(opcode, 4);
 
         shift_amount = (is_register_shift) ? 
@@ -96,58 +146,83 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
 
     switch(operation)
     {
-    case 0b0000: // AND
+    case AluOps::And: // AND
         dst_register = alu_and_tst(op1_register, op2, set_condition_codes);
         break;
-    case 0b0001: // EOR
+    case AluOps::Eor: // EOR
         dst_register = alu_eor_teq(op1_register, op2, set_condition_codes);
         break;
-    case 0b0010: // SUB
+    case AluOps::Sub: // SUB
         dst_register = alu_sub_cmp(op1_register, op2, set_condition_codes);
         break;
-    case 0b0011: // RSB
+    case AluOps::Rsb: // RSB
         dst_register = alu_sub_cmp(op2, op1_register, set_condition_codes);
         break;
-    case 0b0100: // ADD
+    case AluOps::Add: // ADD
         dst_register = alu_add_cmn(op1_register, op2, set_condition_codes);
         break;
-    case 0b0101: // ADC
+    case AluOps::Adc: // ADC
         dst_register = alu_adc(op1_register, op2, set_condition_codes);
         break;
-    case 0b0110: // SBC
+    case AluOps::Sbc: // SBC
         dst_register = alu_sbc(op1_register, op2, set_condition_codes);
         break;
-    case 0b0111: // RSC
+    case AluOps::Rsc: // RSC
         dst_register = alu_sbc(op2, op1_register, set_condition_codes);
         break;
-    case 0b1000: // TST
+    case AluOps::Tst: // TST
         alu_and_tst(op1_register, op2, true);
         break;
-    case 0b1001: // TEQ
+    case AluOps::Teq: // TEQ
         alu_eor_teq(op1_register, op2, true);
         break;
-    case 0b1010: // CMP
+    case AluOps::Cmp: // CMP
         alu_sub_cmp(op1_register, op2, true);
         break;
-    case 0b1011: // CMN
+    case AluOps::Cmn: // CMN
         alu_add_cmn(op1_register, op2, true);
         break;
-    case 0b1100: // ORR
+    case AluOps::Orr: // ORR
         dst_register = alu_orr(op1_register, op2, set_condition_codes);
         break;
-    case 0b1101: // MOV
+    case AluOps::Mov: // MOV
         dst_register = alu_mov(op2, set_condition_codes);
         break;
-    case 0b1110: // BIC
+    case AluOps::Bic: // BIC
         dst_register = alu_bic(op1_register, op2, set_condition_codes);
         break;
-    case 0b1111: // MVN
+    case AluOps::Mvn: // MVN
         dst_register = alu_mov(~op2, set_condition_codes);
         break;
     default:
         std::cout << "Invalid Opcode: " << opcode << '\n';
         break;
     }
+    std::cout << "Dst Register: " << dst_register << '\n';
+    if (dst_reg_index == 15)
+    {
+        if (set_condition_codes)
+        {
+            std::cout << "Curr Mode: " << mode << '\n';
+            std::cout << "SPSR: " << std::bitset<32>(get_mode_spsr(mode)) << '\n';
+            cpsr = get_mode_spsr(mode);
+        }
+        if (operation < 0b1000 || operation > 0b1011)
+        {
+            pc += 8;
+            is_branched = true;
+        }
+    }
+    /*
+      "CPSR": 3489661137,
+      "SPSR": [
+        3489661137,
+        91,
+        1073741840,
+        268435600,
+        2415919195
+      ], 
+    */
 }
 
 void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
@@ -563,43 +638,41 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
     bool swap_byte = Utils::is_bit_set(opcode, 22);
     std::cout << "Byte Swap: " << swap_byte << '\n';
 
-    int src_index = Utils::get_bits(opcode, 0, 4);
     int dst_reg_index = Utils::get_bits(opcode, 12, 16);
     int swap_reg_index = Utils::get_bits(opcode, 16, 20);
 
     std::cout << "Destination Idx: " << dst_reg_index << '\n';
     std::cout << "Source Idx: " << swap_reg_index << '\n';
-    std::cout << "Rm Idx: " << src_index << '\n';
 
     uint32_t& dst_register = *registers[dst_reg_index];
-    uint32_t swap_address = *registers[swap_reg_index];
-    uint32_t src_register = *registers[src_index];
+    uint32_t& swap_address = *registers[swap_reg_index];
+    uint32_t& src_register = arm_get_rm(opcode);
 
     std::cout << "Dest Register Value: " << dst_register << '\n';
     std::cout << "Swap Address Value: " << swap_address << '\n';
     std::cout << "Src Register Value: " << src_register << '\n';
 
-    // So many edge cases with Rm, Rn, Rs = 15 lord
+    pc += 4;
+    is_branched = true;
+
+    uint32_t value{};
+
     if (swap_byte)
     {
         uint8_t swap_address_value = memory.read8(swap_address);    
-        std::cout << "Swap Address Value: " << std::dec << +swap_address_value << '\n';
-        if (src_index == 15) src_register += 4;
         memory.write8(src_register, swap_address);
-        
-        dst_register = swap_address_value;
+        value = swap_address_value;
     }
     else
     {
         uint32_t swap_address_value = memory.read32(swap_address);
-        std::cout << "Swap Address Value: " << std::dec << swap_address_value << '\n';
         memory.write32(src_register, swap_address);
-        if (src_index == 15) src_register += 4;
-        dst_register = (swap_address & 3) ? alu_ror(swap_address_value, (swap_address & 3) * 8, false) : swap_address_value;
+        value = (swap_address & 3) ? alu_ror(swap_address_value, (swap_address & 3) * 8, false) : swap_address_value;
     }
-    
+
+    dst_register = value;
     if (dst_reg_index == 15)
-        dst_register += 4;
+        pc += 8;
 
     std::cout << "Final Dst Value: " << dst_register << '\n';
 }
