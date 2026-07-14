@@ -138,26 +138,105 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         bool is_register_shift = Utils::is_bit_set(opcode, 4);
         std::cout << "Register Shift: " << is_register_shift << '\n';
 
-        uint32_t shift_amount = (is_register_shift) ? 
-            arm_get_rs(opcode) : 
-            Utils::get_bits(opcode, 7, 12);
+        uint32_t shift_amount{}; 
+        if (is_register_shift) 
+        {
+            // Only the least significant byte of the contents of Rs is 
+            // used to determine the shift amount.
+            shift_amount = arm_get_rs(opcode) & 0xFF;
+
+            //  If a register is used to specify the shift amount the PC will be 12 bytes ahead.
+            pc += 4;
+            is_branched = true;
+        }
+        else 
+            shift_amount = Utils::get_bits(opcode, 7, 12);
         std::cout << "Shift Amount: " << +shift_amount << '\n';
+        std::cout << "Shift: " << shift_amount % 32 << '\n';
 
         bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
-        switch(shift_type)
+        if (shift_amount != 0 || !is_register_shift)
         {
+            switch(shift_type)
+            {
             case 0: 
-                op2 = alu_lsl(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
+                if (shift_amount == 32)
+                {
+                    op2 = 0;
+                    if (set_condition_codes)
+                    {
+                        set_negative_and_zero(op2);
+                        if (!is_arithmetic)
+                            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 0));
+                    }
+                }
+                else if (shift_amount > 32)
+                {
+                    op2 = 0;
+                    if (set_condition_codes)
+                    {
+                        set_negative_and_zero(op2);
+                        if (!is_arithmetic)
+                            set_cpsr(ProgramStatusRegsiter::C, false);
+                    }
+                }
+                else 
+                    op2 = alu_lsl(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
                 break;
             case 1: 
-                op2 = alu_lsr(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
+                if (shift_amount == 32)
+                {
+                    op2 = 0;
+                    if (set_condition_codes)
+                    {
+                        set_negative_and_zero(op2);
+                        if (!is_arithmetic)
+                            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 31));
+                    }
+                }
+                else if (shift_amount > 32)
+                {
+                    op2 = 0;
+                    if (set_condition_codes)
+                    {
+                        set_negative_and_zero(op2);
+                        if (!is_arithmetic)
+                            set_cpsr(ProgramStatusRegsiter::C, false);
+                    }
+                }
+                else
+                    op2 = alu_lsr(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
                 break;
             case 2: 
-                op2 = alu_asr(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
+                if (shift_amount >= 32)
+                {
+                    if (Utils::is_bit_set(op2_register, 31))
+                    {
+                        op2 = 0xFFFFFFFF;
+                        if (set_condition_codes)
+                        {
+                            set_negative_and_zero(op2);
+                            if (!is_arithmetic)
+                                set_cpsr(ProgramStatusRegsiter::C, true);
+                        }
+                    }
+                    else
+                    {
+                        op2 = 0;
+                        if (set_condition_codes)
+                        {
+                            set_negative_and_zero(op2);
+                            if (!is_arithmetic)
+                                set_cpsr(ProgramStatusRegsiter::C, false);
+                        }
+                    }
+                }
+                else 
+                    op2 = alu_asr(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
                 break;
             case 3: 
                 // RRX
-                if (!shift_amount)
+                if (shift_amount == 0)
                 {
                     uint32_t result = op2_register;
                     
@@ -172,12 +251,23 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
 
                     op2 = result;
                 }
+                else if (shift_amount > 32)
+                {
+                    uint32_t shift_value = (shift_amount % 32);
+                    if (shift_value == 0)  
+                        shift_value = 32;
+                    op2 = alu_ror(op2_register, shift_value, set_condition_codes, !is_arithmetic);
+                }
                 else 
                     op2 = alu_ror(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
                 break;
-            default: std::runtime_error("Invalid Shift Opcode: " + shift_type);
+                default: std::runtime_error("Invalid Shift Opcode: " + shift_type);
+            }
         }
+        else 
+            op2 = op2_register;
     }
+    
 
     std::cout << "Operand 2: " << op2 << '\n';
 

@@ -19,6 +19,7 @@ int main()
     // GBATests::run_test(cpu, memory, "arm_swp.json");
     // GBATests::run_test(cpu, memory, "arm_data_proc_immediate.json");
     // GBATests::run_test(cpu, memory, "arm_data_proc_immediate_shift.json");
+    // GBATests::run_test(cpu, memory, "arm_data_proc_register_shift.json");
 
     // Passes all THUMB Tests
     // GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");
@@ -45,6 +46,6 @@ int main()
     // GBATests::run_test(cpu, memory, "thumb_ldrh_strh_reg_offset.json");
     // GBATests::run_test(cpu, memory, "thumb_ldrsb_strb_reg_offset.json");
     // GBATests::run_test(cpu, memory, "thumb_ldrsh_ldrsb_reg_offset.json");
-    
+
     return 0;
 }
