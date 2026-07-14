@@ -17,7 +17,8 @@ int main()
     // GBATests::run_test(cpu, memory, "arm_mul_mla.json");
     // GBATests::run_test(cpu, memory, "arm_mull_mlal.json");
     // GBATests::run_test(cpu, memory, "arm_swp.json");
-    GBATests::run_test(cpu, memory, "arm_data_proc_immediate.json");
+    // GBATests::run_test(cpu, memory, "arm_data_proc_immediate.json");
+    // GBATests::run_test(cpu, memory, "arm_data_proc_immediate_shift.json");
 
     // Passes all THUMB Tests
     // GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");

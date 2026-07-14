@@ -23,12 +23,15 @@ uint32_t Arm7TDMI::alu_add_cmn(uint32_t op1, uint32_t op2, bool set_cc)
 
 uint32_t Arm7TDMI::alu_adc(uint32_t op1, uint32_t op2, bool set_cc)
 {
+    std::cout << "----------\n";
+    std::cout << "Add 1: " << op1 << '\n';
+    std::cout << "Add 2: " << op2 << '\n';
     uint32_t result = op1 + op2 + c_set();
 
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, result < op1);
+        set_cpsr(ProgramStatusRegsiter::C, result < op1 || (result == op1 && c_set()));
 
         bool op1_msb_set = Utils::is_bit_set(op1, 31);
         bool op2_msb_set = Utils::is_bit_set(op2, 31);
@@ -110,7 +113,7 @@ uint32_t Arm7TDMI::alu_sbc(uint32_t op1, uint32_t op2, bool set_cc)
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, op1 >= op2 + !c_set());
+        set_cpsr(ProgramStatusRegsiter::C, (result < op1) || (result == op1 && c_set()));
 
         bool op1_msb_set = Utils::is_bit_set(op1, 31);
         bool op2_msb_set = Utils::is_bit_set(op2, 31);
@@ -127,7 +130,7 @@ uint32_t Arm7TDMI::alu_sub_cmp(uint32_t op1, uint32_t op2, bool set_cc)
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, op1 >= op2);
+        set_cpsr(ProgramStatusRegsiter::C, result <= op1);
 
         bool op1_msb_set = Utils::is_bit_set(op1, 31);
         bool op2_msb_set = Utils::is_bit_set(op2, 31);
@@ -138,7 +141,7 @@ uint32_t Arm7TDMI::alu_sub_cmp(uint32_t op1, uint32_t op2, bool set_cc)
 }
 
 /* Shift Operations */
-uint32_t Arm7TDMI::alu_lsl(uint32_t op1, uint32_t op2, bool set_cc) // Logical Shift Left
+uint32_t Arm7TDMI::alu_lsl(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry) // Logical Shift Left
 {
     // LSL#0 = no shift applied,
     // the C flag is NOT affected.
@@ -146,13 +149,13 @@ uint32_t Arm7TDMI::alu_lsl(uint32_t op1, uint32_t op2, bool set_cc) // Logical S
     if (set_cc)
     {
         set_negative_and_zero(result);
-        if (op2 != 0) 
+        if (op2 != 0 && set_carry) 
             set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 32 - op2));
     }
     return result;
 }
 
-uint32_t Arm7TDMI::alu_lsr(uint32_t op1, uint32_t op2, bool set_cc) // Logical Shift Right
+uint32_t Arm7TDMI::alu_lsr(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry) // Logical Shift Right
 {
     // LSR#0 is interpreted as LSR#32
     // Op2 becomes zero, C becomes Bit 31 of Rm.
@@ -161,10 +164,14 @@ uint32_t Arm7TDMI::alu_lsr(uint32_t op1, uint32_t op2, bool set_cc) // Logical S
     if (set_cc)
     {
         set_negative_and_zero(result);
-        if (op2 != 0) 
-            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
-        else   
-            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 31)); 
+
+        if (set_carry)
+        {
+            if (op2 != 0) 
+                set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
+            else   
+                set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 31)); 
+        }
     }
     return result;
 
@@ -172,7 +179,7 @@ uint32_t Arm7TDMI::alu_lsr(uint32_t op1, uint32_t op2, bool set_cc) // Logical S
     // 1011
 }
 
-uint32_t Arm7TDMI::alu_asr(uint32_t op1, uint32_t op2, bool set_cc)
+uint32_t Arm7TDMI::alu_asr(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry)
 {
     // ASR#0 is interpreted as ASR#32
     // Op2 and C are filled by Bit 31 of Rm.
@@ -184,7 +191,8 @@ uint32_t Arm7TDMI::alu_asr(uint32_t op1, uint32_t op2, bool set_cc)
     if (set_cc)
     {
         set_negative_and_zero(result);
-        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
+        if (set_carry)
+            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, op2 - 1));
     }
     return result;
 }
@@ -234,14 +242,14 @@ uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc, bool set_car
     return result;
 }
 
-uint32_t Arm7TDMI::decode_shift_operation(uint32_t op1, uint32_t op2, int shift_type)
+uint32_t Arm7TDMI::decode_shift_operation(uint32_t op1, uint32_t op2, int shift_type, bool set_cc, bool set_carry)
 {
     switch(shift_type)
     {
-    case 0: return alu_lsl(op1, op2, true);
-    case 1: return alu_lsr(op1, op2, true);
-    case 2: return alu_asr(op1, op2, true);
-    case 3: return alu_ror(op1, op2, true);
+    case 0: return alu_lsl(op1, op2, set_cc, set_carry);
+    case 1: return alu_lsr(op1, op2, set_cc, set_carry);
+    case 2: return alu_asr(op1, op2, set_cc, set_carry);
+    case 3: return alu_ror(op1, op2, set_cc, set_carry);
     default: std::runtime_error("Invalid Shift Opcode: " + shift_type);
     }
     
@@ -263,9 +271,7 @@ uint32_t Arm7TDMI::alu_mul(uint32_t op1, uint32_t op2, bool set_cc)
     if (set_cc)
     {
         set_negative_and_zero(result);
-
-        uint64_t mult = op1 * op2;
-        set_cpsr(ProgramStatusRegsiter::C, mult > std::numeric_limits<uint32_t>().max());
+        set_cpsr(ProgramStatusRegsiter::C, result < op1);
     }
     return result;
 }

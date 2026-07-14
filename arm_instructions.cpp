@@ -99,6 +99,7 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     std::cout << "Operation: " << operation << '\n';
 
     bool set_condition_codes = Utils::is_bit_set(opcode, 20);
+    std::cout << "Set CC: " << set_condition_codes << '\n';
     bool is_immediate = Utils::is_bit_set(opcode, 25);
     std::cout << "Is Immediate: " << is_immediate << '\n';
 
@@ -129,20 +130,56 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     }
     else 
     {
-        uint32_t op2_register = arm_get_rm(opcode);
-        uint8_t shift_amount{};
-        std::cout << "Shift Amount: " << shift_amount << '\n';
+        uint32_t& op2_register = arm_get_rm(opcode);
 
         int shift_type = Utils::get_bits(opcode, 5, 7);
         std::cout << "Shift Type: " << shift_type << '\n';
-        bool is_register_shift = Utils::is_bit_set(opcode, 4);
 
-        shift_amount = (is_register_shift) ? 
+        bool is_register_shift = Utils::is_bit_set(opcode, 4);
+        std::cout << "Register Shift: " << is_register_shift << '\n';
+
+        uint32_t shift_amount = (is_register_shift) ? 
             arm_get_rs(opcode) : 
             Utils::get_bits(opcode, 7, 12);
+        std::cout << "Shift Amount: " << +shift_amount << '\n';
 
-        op2 = decode_shift_operation(op2_register, shift_amount, shift_type);
+        bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
+        switch(shift_type)
+        {
+            case 0: 
+                op2 = alu_lsl(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
+                break;
+            case 1: 
+                op2 = alu_lsr(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
+                break;
+            case 2: 
+                op2 = alu_asr(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
+                break;
+            case 3: 
+                // RRX
+                if (!shift_amount)
+                {
+                    uint32_t result = op2_register;
+                    
+                    result >>= 1;
+                    result |= (c_set() << 31);
+                    if (set_condition_codes)
+                    {
+                        set_negative_and_zero(result);
+                        if (!is_arithmetic)
+                            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 0));
+                    }
+
+                    op2 = result;
+                }
+                else 
+                    op2 = alu_ror(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
+                break;
+            default: std::runtime_error("Invalid Shift Opcode: " + shift_type);
+        }
     }
+
+    std::cout << "Operand 2: " << op2 << '\n';
 
     switch(operation)
     {
@@ -198,6 +235,7 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         std::cout << "Invalid Opcode: " << opcode << '\n';
         break;
     }
+
     std::cout << "Dst Register: " << dst_register << '\n';
     if (dst_reg_index == 15)
     {
@@ -207,7 +245,7 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
             std::cout << "SPSR: " << std::bitset<32>(get_mode_spsr(mode)) << '\n';
             cpsr = get_mode_spsr(mode);
         }
-        if (operation < 0b1000 || operation > 0b1011)
+        if (operation < AluOps::Tst || operation > AluOps::Cmn)
         {
             pc += 8;
             is_branched = true;
