@@ -160,7 +160,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         dest_register = alu_mov(~src_register, true);
         break;
     default:
-        throw std::runtime_error("ERROR (THUMB HI REG Operation): " + operation);
+        throw std::runtime_error("ERROR (THUMB HI REG Operation): " + std::to_string(operation));
         break;
     }
 }
@@ -224,11 +224,9 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
         branch_and_exchange(src_register);
         break;
     default:
-        throw std::runtime_error("ERROR (THUMB HI REG Operation): " + operation);
+        throw std::runtime_error("ERROR (THUMB HI REG Operation): " + std::to_string(operation));
         break;
     }
-
-    // std::cout << "Final Value: " << dest_register << '\n';
 }
 
 
@@ -682,17 +680,20 @@ Final:
 
 void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 {
-    // std::cout << "THUMB Software Interrupt\n";
+    std::cout << "THUMB Software Interrupt\n";
 
     assert(Utils::get_bits(opcode, 8, 16) == 0b1101'1111);
 
     /// @note Value8 is used solely by the SWI handler: it is ignored by the processor
-    old_cpsr = cpsr;
-    handle_state_switch(CpuState::Arm);
-    handle_mode_switch(CpuMode::Supervisor);
+    /// @note The bottom 24 bits of the instruction are ignored by the processor
+    handle_state_switch(ArmState::Arm);
+
+    spsr_svc = cpsr;
+    handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
+     
     get_link() = pc - 2;
-    pc = Arm7VectorAddr::SWI + 4;
+    pc = Arm7VectorAddr::SWI + 8;
     is_branched = true;
 }
 
@@ -743,11 +744,13 @@ void Arm7TDMI::thumb_undefined(uint16_t opcode)
 {
     // std::cout << "THUMB Undefined\n";
 
-    old_cpsr = cpsr;
-    handle_state_switch(CpuState::Arm);
-    handle_mode_switch(CpuMode::Supervisor);
+    handle_state_switch(ArmState::Arm);
+
+    spsr_svc = cpsr;
+    handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
+     
     get_link() = pc - 2;
-    pc = Arm7VectorAddr::UNDEFINED + 4;
+    pc = Arm7VectorAddr::SWI + 8;
     is_branched = true;
 }

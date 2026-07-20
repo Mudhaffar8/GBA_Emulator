@@ -51,14 +51,12 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     cpsr &= ~ProgramStatusRegsiter::Mode;
     cpsr |= new_mode;
 
-    mode = static_cast<CpuMode>(new_mode);
-
     std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
 
     switch(new_mode)
     {
-    case CpuMode::User:
-    case CpuMode::System:
+    case ArmMode::User:
+    case ArmMode::System:
         std::cout << "USER/SYSTEM\n";
         registers[8] = &r8;
         registers[9] = &r9;
@@ -69,7 +67,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         registers[14] = &r14;
         break;
 
-    case CpuMode::FastInterrupt:
+    case ArmMode::FastInterrupt:
         std::cout << "FIQ\n";
         registers[8] = &r8_fiq;
         registers[9] = &r9_fiq;
@@ -80,7 +78,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         registers[14] = &r14_fiq;
         break;
 
-    case CpuMode::InterruptRequest:
+    case ArmMode::InterruptRequest:
         std::cout << "IRQ\n";
         registers[8] = &r8;
         registers[9] = &r9;
@@ -89,10 +87,9 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         registers[12] = &r12;
         registers[13] = &r13_irq;
         registers[14] = &r14_irq;
-        spsr_irq = old_cpsr; 
         break;
 
-    case CpuMode::Supervisor:
+    case ArmMode::Supervisor:
         std::cout << "SVC\n";
         registers[8] = &r8;
         registers[9] = &r9;
@@ -101,10 +98,9 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         registers[12] = &r12;
         registers[13] = &r13_svc;
         registers[14] = &r14_svc;
-        spsr_svc = old_cpsr; 
         break;
 
-    case CpuMode::Abort:
+    case ArmMode::Abort:
         std::cout << "ABT\n";
         registers[8] = &r8;
         registers[9] = &r9;
@@ -113,10 +109,9 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         registers[12] = &r12;
         registers[13] = &r13_abt;
         registers[14] = &r14_abt;
-        spsr_abt = old_cpsr; 
         break;
 
-    case CpuMode::Undefined:
+    case ArmMode::Undefined:
         std::cout << "UND\n";
         registers[8] = &r8;
         registers[9] = &r9;
@@ -125,58 +120,52 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         registers[12] = &r12;
         registers[13] = &r13_und;
         registers[14] = &r14_und;
-        spsr_und = old_cpsr; 
         break;
 
     default:
-        std::runtime_error("Invalid Mode: " + +new_mode);
+        // throw std::runtime_error("Invalid Mode: " + std::to_string(new_mode));
         break;
     }
 }
 
-uint32_t& Arm7TDMI::get_mode_spsr(CpuMode mode)
+uint32_t& Arm7TDMI::get_mode_spsr(uint32_t mode)
 {
     switch(mode)
     {
-    case CpuMode::User:
-    case CpuMode::System:
+    case ArmMode::User:
+    case ArmMode::System:
         return cpsr;
     
-    case CpuMode::Abort: return spsr_abt;
-    case CpuMode::Supervisor: return spsr_svc;
-    case CpuMode::FastInterrupt: return spsr_fiq;
-    case CpuMode::InterruptRequest: return spsr_irq;
-    case CpuMode::Undefined: return spsr_und;
+    case ArmMode::Abort: return spsr_abt;
+    case ArmMode::Supervisor: return spsr_svc;
+    case ArmMode::FastInterrupt: return spsr_fiq;
+    case ArmMode::InterruptRequest: return spsr_irq;
+    case ArmMode::Undefined: return spsr_und;
     }
 
+    assert("Invalid SPSR: " == "");
     return cpsr;
 }
 
-void Arm7TDMI::handle_state_switch(CpuState new_state)
+void Arm7TDMI::handle_state_switch(uint32_t new_state)
 {
-    state = new_state;
-
     cpsr &= ~ProgramStatusRegsiter::T;
     cpsr |= new_state;
 }
 
 void Arm7TDMI::branch_and_exchange(uint32_t address)
 {
-    // std::cout << "Old PC: " << pc << '\n';
-    // std::cout << "New Branch Address: " << address << '\n';
-    // std::cout << "Lower 2 bits: " << (address & 3) << '\n';
-
     uint32_t new_address = Utils::get_bits(address, 1, 32) << 1;
     if (address & 1)
     {
         pc = new_address + 4;
-        handle_state_switch(CpuState::Thumb);
+        handle_state_switch(ArmState::Thumb);
     }
     else
     {
         // 0b10 is unpredictable behaviour
         pc = new_address + 8;
-        handle_state_switch(CpuState::Arm);
+        handle_state_switch(ArmState::Arm);
     }
 
     is_branched = true;
@@ -234,6 +223,8 @@ std::array<Arm7TDMI::ArmFunc, 4096> Arm7TDMI::generate_arm_table()
                     table[i] = &arm_branch_and_exchange;
                 else if ((bits_4_to_7 & 0b1001) == 0b1001)
                     table[i] = &arm_halfword_data_transfer;
+                else if ((bits_20_to_24 & 0b11001) == 0b10000)
+                    table[i] = &arm_psr_transfer;
                 else  
                     table[i] = &arm_data_processing;
             }
@@ -253,7 +244,9 @@ std::array<Arm7TDMI::ArmFunc, 4096> Arm7TDMI::generate_arm_table()
             break;
 
         case 0b001:
-            table[i] = &arm_data_processing;
+            table[i] = ((bits_20_to_24 & 0b11001) == 0b10000) ? 
+                &arm_psr_transfer : 
+                &arm_data_processing;
             break;
 
         case 0b010:

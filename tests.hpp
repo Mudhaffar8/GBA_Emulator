@@ -114,7 +114,6 @@ public:
             cpu.r14_und = static_cast<uint32_t>((*it)["initial"]["R_und"][1]);
 
             cpu.spsr_fiq = static_cast<uint32_t>((*it)["initial"]["SPSR"][0]);
-            std::cout << "SPSR FIQ: " << std::bitset<32>(cpu.spsr_fiq) << '\n';
             cpu.spsr_svc = static_cast<uint32_t>((*it)["initial"]["SPSR"][1]);
             cpu.spsr_abt = static_cast<uint32_t>((*it)["initial"]["SPSR"][2]);
             cpu.spsr_irq = static_cast<uint32_t>((*it)["initial"]["SPSR"][3]);
@@ -144,15 +143,15 @@ public:
                 }
             }
             
-            if ((Arm7TDMI::ProgramStatusRegsiter::T & cpu.cpsr) == 0)
-            {
-                uint32_t opcode = static_cast<uint32_t>((*it)["opcode"]);
-                cpu.arm_execute(opcode);
-            }
-            else
+            if (cpu.is_thumb_mode())
             {
                 uint16_t opcode = static_cast<uint16_t>((*it)["opcode"]);
                 cpu.thumb_execute(opcode);
+            }
+            else
+            {
+                uint32_t opcode = static_cast<uint32_t>((*it)["opcode"]);
+                cpu.arm_execute(opcode);
             }
 
             // Set CPU register values
@@ -214,7 +213,7 @@ public:
 
             mem.clear_memory();
 
-            std::cout << "\nPassed Test #" << number << '\n';
+            std::cout << "\nPassed Test #" << std::dec << number << '\n';
         }
 
         std::cout << "Passed All Tests: " << file_name << '\n';

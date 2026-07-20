@@ -23,9 +23,6 @@ uint32_t Arm7TDMI::alu_add_cmn(uint32_t op1, uint32_t op2, bool set_cc)
 
 uint32_t Arm7TDMI::alu_adc(uint32_t op1, uint32_t op2, bool set_cc)
 {
-    std::cout << "----------\n";
-    std::cout << "Add 1: " << op1 << '\n';
-    std::cout << "Add 2: " << op2 << '\n';
     uint32_t result = op1 + op2 + c_set();
 
     if (set_cc)
@@ -141,6 +138,7 @@ uint32_t Arm7TDMI::alu_sub_cmp(uint32_t op1, uint32_t op2, bool set_cc)
 }
 
 /* Shift Operations */
+/// @note For all shift operations, cases where op2 >= 32 are handled at the call site.
 uint32_t Arm7TDMI::alu_lsl(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry) // Logical Shift Left
 {
     // LSL#0 = no shift applied,
@@ -174,9 +172,6 @@ uint32_t Arm7TDMI::alu_lsr(uint32_t op1, uint32_t op2, bool set_cc, bool set_car
         }
     }
     return result;
-
-    // 1001
-    // 1011
 }
 
 uint32_t Arm7TDMI::alu_asr(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry)
@@ -214,9 +209,7 @@ uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc, bool set_car
         V Flag = unaffected
     */
     uint32_t result = op1;
-    if (Utils::get_bits(op2, 0, 8) == 0 && Utils::get_bits(op2, 0, 5) == 0)
-    {}
-    else
+    if (Utils::get_bits(op2, 0, 5) != 0 || Utils::get_bits(op2, 0, 8) != 0)
     {
         // std::cout << "Old Val: " << std::bitset<32>(op1) << '\n';
 
@@ -236,6 +229,7 @@ uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc, bool set_car
 
         // std::cout << "New Val: " << std::bitset<32>(result) << '\n';
     }
+
     if (set_cc)
         set_negative_and_zero(result);
     
@@ -246,11 +240,11 @@ uint32_t Arm7TDMI::decode_shift_operation(uint32_t op1, uint32_t op2, int shift_
 {
     switch(shift_type)
     {
-    case 0: return alu_lsl(op1, op2, set_cc, set_carry);
-    case 1: return alu_lsr(op1, op2, set_cc, set_carry);
-    case 2: return alu_asr(op1, op2, set_cc, set_carry);
-    case 3: return alu_ror(op1, op2, set_cc, set_carry);
-    default: std::runtime_error("Invalid Shift Opcode: " + shift_type);
+        case 0: return alu_lsl(op1, op2, set_cc, set_carry);
+        case 1: return alu_lsr(op1, op2, set_cc, set_carry);
+        case 2: return alu_asr(op1, op2, set_cc, set_carry);
+        case 3: return alu_ror(op1, op2, set_cc, set_carry);
+        default: throw std::runtime_error("Invalid Shift Opcode: " + std::to_string(shift_type));
     }
     
     return 0;

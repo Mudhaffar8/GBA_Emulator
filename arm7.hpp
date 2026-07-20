@@ -6,6 +6,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 #include "memory.hpp"
 #include "utils.hpp"
@@ -51,7 +52,7 @@ private:
         // 0b1111 is reserved and must not be used
     };
 
-    enum CpuMode 
+    enum ArmMode 
     {
         User = 0b10000,
         FastInterrupt = 0b10001,
@@ -62,7 +63,7 @@ private:
         System = 0b11111
     };
 
-    enum CpuState
+    enum ArmState
     {
         Arm = 0x00,
         Thumb = 0x20
@@ -75,6 +76,7 @@ private:
         Z = (1 << 30), // Zero
         C = (1 << 29), // Carry or borrow or extend, unsigned
         V = (1 << 28), // Overflow, signed
+        Flags = (0xF << 28),
         
         /* Interrupts */
         I = (1 << 7), // IRQ Disable
@@ -83,7 +85,7 @@ private:
         T = (1 << 5), // State bit
         Mode = 0x1F  // Mode bit
     };
-
+ 
 private:
     using ArmFunc = void (Arm7TDMI::*)(uint32_t opcode);
     using ThumbFunc = void (Arm7TDMI::*)(uint16_t opcode);
@@ -115,9 +117,6 @@ private:
     uint32_t cpsr{}, old_cpsr{};
     uint32_t spsr_fiq{}, spsr_svc{}, spsr_abt{}, spsr_irq{}, spsr_und{};
 
-    CpuMode mode = CpuMode::User;
-    CpuState state = CpuState::Arm;
-
     bool is_branched = false;
     bool skip_mult_instr = false; // Skipping mult cpsr flag on SST
     bool skip_instr = false;
@@ -125,6 +124,12 @@ private:
 private:
     inline uint32_t& get_sp() { return *registers[13]; }
     inline uint32_t& get_link() { return *registers[14]; }
+
+    inline uint32_t get_curr_mode() { return cpsr & ProgramStatusRegsiter::Mode; }
+    inline bool is_thumb_mode() { return cpsr & ProgramStatusRegsiter::T; }
+
+    inline bool is_privileged_mode() { return get_curr_mode() != ArmMode::User; }
+    inline bool mode_has_spsr() { return get_curr_mode() != ArmMode::User && get_curr_mode() != ArmMode::System; }
 
     /* Instruction Table Dispatch */
     std::array<ArmFunc, 4096> generate_arm_table();
@@ -134,9 +139,9 @@ private:
     void thumb_execute(uint16_t opcode);
 
     void handle_mode_switch(uint32_t new_mode);
-    void handle_state_switch(CpuState new_state);
+    void handle_state_switch(uint32_t new_state);
 
-    uint32_t& get_mode_spsr(CpuMode mode);
+    uint32_t& get_mode_spsr(uint32_t mode);
 
     bool check_condition_code(uint32_t code);
     constexpr void set_cpsr(ProgramStatusRegsiter bit, bool cond) { cpsr = (cond) ? (cpsr | bit) : (cpsr & ~bit); }
@@ -171,6 +176,8 @@ private:
     /* Branching */
     void branch_and_exchange(uint32_t address);
 
+    /// @todo Make arm and thumb instructions into static methods
+    /// Take CPU reference as an argument
     /* ARM Instructions */
     void arm_branch(uint32_t opcode); // Branch, Branch and Link
     void arm_branch_and_exchange(uint32_t opcode);
@@ -191,7 +198,7 @@ private:
     /* THUMB Instructions */
     // I gotta find shorter method names
     void thumb_add_subtract(uint16_t opcode);
-    void thumb_add_offset_sp(uint16_t opcode); // stack pointer
+    void thumb_add_offset_sp(uint16_t opcode);
     void thumb_alu_operations(uint16_t opcode);
     void thumb_conditional_branch(uint16_t opcode);
     void thumb_hi_reg_op_branch_exchange(uint16_t opcode);
@@ -288,6 +295,19 @@ private:
         uint32_t popped_value = memory.read32(get_sp());
         get_sp() += 4;
         return popped_value;
+    }
+
+    /* Setting PC Register */
+    inline void set_pc_word_offset(uint32_t new_addr) 
+    {
+        pc = new_addr + 8;
+        is_branched = true;
+    }
+
+    inline void set_pc_halfword_offset(uint32_t new_addr) 
+    {
+        pc = new_addr + 4;
+        is_branched = true;
     }
 
     friend class GBATests;

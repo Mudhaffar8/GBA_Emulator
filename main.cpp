@@ -20,18 +20,25 @@ int main()
     // GBATests::run_test(cpu, memory, "arm_data_proc_immediate.json");
     // GBATests::run_test(cpu, memory, "arm_data_proc_immediate_shift.json");
     // GBATests::run_test(cpu, memory, "arm_data_proc_register_shift.json");
+    // GBATests::run_test(cpu, memory, "arm_mrs.json");
+    // GBATests::run_test(cpu, memory, "arm_msr_reg.json");    
+
+    // 11110000000000000000000011010011 <-- Initial
+    // 10111010101101100000000011010011 <-- Expected
+    // 10111010101101101011000101000011 <-- Got
+    // Mode bits remain the same
+    // bits 31-16(ish) are changed
 
     // Passes all THUMB Tests
     // GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");
     // GBATests::run_test(cpu, memory, "thumb_add_sub.json");
-    // GBATests::run_test(cpu, memory, "thumb_b.json");
+    // GBATests::run_test(cpu, memory, "thumb_b.json"); 
     // GBATests::run_test(cpu, memory, "thumb_bcc.json");
     // GBATests::run_test(cpu, memory, "thumb_add_sub_sp.json");
     // GBATests::run_test(cpu, memory, "thumb_push_pop.json");
     // GBATests::run_test(cpu, memory, "thumb_ldr_pc_rel.json");
     // GBATests::run_test(cpu, memory, "thumb_lsl_lsr_asr.json");
     // GBATests::run_test(cpu, memory, "thumb_ldm_stm.json");
-    // GBATests::run_test(cpu, memory, "thumb_swi.json");
     // GBATests::run_test(cpu, memory, "thumb_undefined_bcc.json");
     // GBATests::run_test(cpu, memory, "thumb_data_proc.json");
     // GBATests::run_test(cpu, memory, "thumb_ldrh_strh_imm_offset.json");

@@ -123,8 +123,6 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         int shift = Utils::get_bits(opcode, 8, 12);
         std::cout << "Shift: " << shift << '\n';
 
-        // Either the CC set after alu_ror are wrong (carry should not be set)
-        // Or, the CC should not be touched for certain instructions?
         bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
         op2 = alu_ror(imm8, shift * 2, set_condition_codes, !is_arithmetic);
     }
@@ -155,6 +153,7 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         std::cout << "Shift: " << shift_amount % 32 << '\n';
 
         bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
+        bool update_carry_flag = set_condition_codes && !is_arithmetic;
         if (shift_amount != 0 || !is_register_shift)
         {
             switch(shift_type)
@@ -163,22 +162,14 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
                 if (shift_amount == 32)
                 {
                     op2 = 0;
-                    if (set_condition_codes)
-                    {
-                        set_negative_and_zero(op2);
-                        if (!is_arithmetic)
-                            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 0));
-                    }
+                    if (update_carry_flag)
+                        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 0));
                 }
                 else if (shift_amount > 32)
                 {
                     op2 = 0;
-                    if (set_condition_codes)
-                    {
-                        set_negative_and_zero(op2);
-                        if (!is_arithmetic)
+                    if (update_carry_flag)
                             set_cpsr(ProgramStatusRegsiter::C, false);
-                    }
                 }
                 else 
                     op2 = alu_lsl(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
@@ -187,22 +178,14 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
                 if (shift_amount == 32)
                 {
                     op2 = 0;
-                    if (set_condition_codes)
-                    {
-                        set_negative_and_zero(op2);
-                        if (!is_arithmetic)
-                            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 31));
-                    }
+                    if (update_carry_flag)
+                        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 31));
                 }
                 else if (shift_amount > 32)
                 {
                     op2 = 0;
-                    if (set_condition_codes)
-                    {
-                        set_negative_and_zero(op2);
-                        if (!is_arithmetic)
-                            set_cpsr(ProgramStatusRegsiter::C, false);
-                    }
+                    if (update_carry_flag)
+                        set_cpsr(ProgramStatusRegsiter::C, false);
                 }
                 else
                     op2 = alu_lsr(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
@@ -213,22 +196,14 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
                     if (Utils::is_bit_set(op2_register, 31))
                     {
                         op2 = 0xFFFFFFFF;
-                        if (set_condition_codes)
-                        {
-                            set_negative_and_zero(op2);
-                            if (!is_arithmetic)
-                                set_cpsr(ProgramStatusRegsiter::C, true);
-                        }
+                        if (update_carry_flag)
+                            set_cpsr(ProgramStatusRegsiter::C, true);
                     }
                     else
                     {
                         op2 = 0;
-                        if (set_condition_codes)
-                        {
-                            set_negative_and_zero(op2);
-                            if (!is_arithmetic)
-                                set_cpsr(ProgramStatusRegsiter::C, false);
-                        }
+                        if (update_carry_flag)
+                            set_cpsr(ProgramStatusRegsiter::C, false);
                     }
                 }
                 else 
@@ -242,12 +217,8 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
                     
                     result >>= 1;
                     result |= (c_set() << 31);
-                    if (set_condition_codes)
-                    {
-                        set_negative_and_zero(result);
-                        if (!is_arithmetic)
-                            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 0));
-                    }
+                    if (update_carry_flag)
+                        set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op2_register, 0));
 
                     op2 = result;
                 }
@@ -261,7 +232,8 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
                 else 
                     op2 = alu_ror(op2_register, shift_amount, set_condition_codes, !is_arithmetic);
                 break;
-                default: std::runtime_error("Invalid Shift Opcode: " + shift_type);
+                
+                default: throw std::runtime_error("Invalid Shift Opcode: " + std::to_string(shift_type));
             }
         }
         else 
@@ -331,9 +303,9 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     {
         if (set_condition_codes)
         {
-            std::cout << "Curr Mode: " << mode << '\n';
-            std::cout << "SPSR: " << std::bitset<32>(get_mode_spsr(mode)) << '\n';
-            cpsr = get_mode_spsr(mode);
+            uint32_t curr_mode = get_curr_mode();
+            std::cout << "SPSR: " << std::bitset<32>(get_mode_spsr(curr_mode)) << '\n';
+            cpsr = get_mode_spsr(curr_mode);
         }
         if (operation < AluOps::Tst || operation > AluOps::Cmn)
         {
@@ -341,16 +313,6 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
             is_branched = true;
         }
     }
-    /*
-      "CPSR": 3489661137,
-      "SPSR": [
-        3489661137,
-        91,
-        1073741840,
-        268435600,
-        2415919195
-      ], 
-    */
 }
 
 void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
@@ -408,7 +370,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         }
 
         if (load_psr_or_force_usr_mode)
-            cpsr = get_mode_spsr(mode);
+            cpsr = get_mode_spsr(get_curr_mode());
     }
     else
     {
@@ -443,8 +405,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         }
 
         if (load_psr_or_force_usr_mode)
-            cpsr = get_mode_spsr(mode);       
-        
+            cpsr = get_mode_spsr(get_curr_mode());          
     }
 
     if (writeback_to_base)
@@ -463,7 +424,7 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
     bool add_to_offset = Utils::is_bit_set(opcode, 23);
     bool writeback_to_base = Utils::is_bit_set(opcode, 22);
     bool is_load = Utils::is_bit_set(opcode, 21);
-    bool sh_flag = Utils::get_bits(opcode, 5, 7);
+    int sh_flag = Utils::get_bits(opcode, 5, 7);
 
     assert(sh_flag != 0); // 0b00 is the SWAP instruction
 
@@ -628,21 +589,13 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 
     bool set_condition_codes = Utils::is_bit_set(opcode, 20);
     bool accumulate = Utils::is_bit_set(opcode, 21);
-    std::cout << "Accumulate: " << accumulate << '\n';
     bool is_signed = Utils::is_bit_set(opcode, 22);
-    std::cout << "Is Signed: " << is_signed << '\n';
 
     int dst_lo_index = Utils::get_bits(opcode, 12, 16);
     int dst_hi_index = Utils::get_bits(opcode, 16, 20);
 
-    std::cout << "Dst Hi Idx: " << dst_hi_index << '\n';
-    std::cout << "Dst Lo Idx: " << dst_lo_index << '\n';
-
     uint32_t& dst_register_hi = *registers[dst_hi_index];
     uint32_t& dst_register_lo = *registers[dst_lo_index];
-
-    std::cout << "Dest Register Hi: " << dst_register_hi << '\n';
-    std::cout << "Dest Register Lo: " << dst_register_lo << '\n';
 
     uint32_t& op1_register_mult = arm_get_rs(opcode);
     uint32_t& op2_register_mult = arm_get_rm(opcode);
@@ -656,11 +609,8 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     {
         int32_t op1_signed = static_cast<int32_t>(op1_register_mult);
         int32_t op2_signed = static_cast<int32_t>(op2_register_mult);
-        std::cout << "Op1 signed: " << op1_signed << '\n';
-        std::cout << "Op2 signed: " << op2_signed << '\n';
 
         int64_t result = static_cast<int64_t>(op1_signed) * static_cast<int64_t>(op2_signed);
-        std::cout << "Result:      " << std::bitset<64>(result) << '\n';
         result_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
 
         bool carry = result_lo < (result & 0xFFFFFFFF);
@@ -676,7 +626,6 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
         result_lo = (result & 0xFFFFFFFF) + (accumulate * dst_register_lo);
 
         bool carry = result_lo < (result & 0xFFFFFFFF);
-        std::cout << "Carry: " << carry << '\n';
 
         result_hi = (result >> 32) + (accumulate * dst_register_hi) + carry;
     }
@@ -691,7 +640,7 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     {
         set_cpsr(ProgramStatusRegsiter::N, dst_register_hi & Utils::MSB32);
         set_cpsr(ProgramStatusRegsiter::Z, dst_register_hi == 0 && dst_register_lo == 0);
-        set_cpsr(ProgramStatusRegsiter::C, dst_register_hi < op1_register_mult);
+        set_cpsr(ProgramStatusRegsiter::C, dst_register_hi < op1_register_mult); // Carry Flag is destroyed anyways
          
         skip_mult_instr = true;
     }
@@ -703,12 +652,12 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 
     assert(Utils::get_bits(opcode, 26, 28) == 0b00);
     assert(Utils::get_bits(opcode, 23, 25) == 0b10);
-    assert(!Utils::get_bits(opcode, 19, 21) == 0b01);
-    //  1010001111
-    //  001111xxxx
 
     bool set_to_spsr = Utils::is_bit_set(opcode, 22);
-    uint32_t& psr = (set_to_spsr) ? get_mode_spsr(mode) : cpsr;
+    std::cout << "Set to SPSR: " << set_to_spsr << '\n';
+    
+    uint32_t& psr = (set_to_spsr) ? get_mode_spsr(get_curr_mode()) : cpsr;
+    std::cout << "SPSR Before: " << std::bitset<32>(psr) << "\n";
 
     if (Utils::get_bits(opcode, 16, 22) == 0b001111)
     {
@@ -717,34 +666,75 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
         uint32_t& dest_register = *registers[dst_reg_index];
 
         dest_register = psr;
-        
+
+        // Strangely no Rd = 15 edge case for these tests
         return;
     }
-    else if (Utils::get_bits(opcode, 12, 22) == 0b1010011111)
+    else 
     {
-        // MSR (transfer register contents to PSR)
-        uint32_t src_register = arm_get_rm(opcode); 
-        psr = src_register;
+        uint32_t byte_mask = Utils::is_bit_set(opcode, 16) ? 0xFF : 0;
+        byte_mask |= Utils::is_bit_set(opcode, 17) ? 0x0000FF00 : 0;
+        byte_mask |= Utils::is_bit_set(opcode, 18) ? 0x00FF0000 : 0;
+        byte_mask |= Utils::is_bit_set(opcode, 19) ? 0xFF000000 : 0;
+        std::cout << "Byte Mask: 0x" << std::hex << byte_mask << '\n';
 
-        return;
-    }
-    else if (Utils::get_bits(opcode, 12, 22) == 0b1010001111)
-    {
-        // MSR (transfer register contents or imm val to PSR flag bits)
-        bool is_immediate = Utils::is_bit_set(opcode, 25);
-
-        uint32_t operand{};
-        if (is_immediate)
+        if (Utils::get_bits(opcode, 4, 8) == 0)
         {
-            uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
-            int rotate = Utils::get_bits(opcode, 8, 12);
+            std::cout << "User Mode: " << !is_privileged_mode() << '\n';
+            std::cout << "MSR (transfer register contents to PSR)\n";
+            // MSR (transfer register contents to PSR)
+            uint32_t src_register = arm_get_rm(opcode); 
+            std::cout << "Src Register: " << std::bitset<32>(src_register) << '\n';
             
-            operand = alu_ror(imm8, rotate, false);
-        }
-        else
-            operand = arm_get_rm(opcode);
+            if (src_register & 0x0FFFFF00) // UnallocMask
+                std::cout << "UNPREDICTBLE\n";
 
-        psr = operand << 24;
+            if (set_to_spsr && !mode_has_spsr())
+                return;
+            
+            // In non-privileged mode (user mode): only condition 
+            // code bits of CPSR can be changed, control bits can’t.
+            uint32_t mask = (!is_privileged_mode()) ? byte_mask & 0xFF000000 : byte_mask;
+            std::cout << "Mask: " << std::bitset<16>(mask) << '\n';
+            std::cout << "Result: " << std::bitset<16>(src_register & mask) << '\n';
+
+            psr &= ~mask;
+            std::cout << "PSR after mask: " << std::bitset<32>(psr) << '\n';
+            psr |= (src_register & mask);
+            std::cout << "PSR after src register: " << std::bitset<32>(psr) << '\n';
+            
+            // Why is bit 4 not set here? huh?
+            // 01010000000000000001001001100111 <-- Expected
+            // 01010000000000000001001001110111 <-- What I got
+
+            /// @note should probably look into the behaviour for when
+            /// the mode bits are set to an invalid mode number
+        }
+        else if (Utils::get_bits(opcode, 12, 22) == 0)
+        {
+            std::cout << "MSR (transfer register contents or imm val to PSR flag bits)\n";
+            // MSR (transfer register contents or imm val to PSR flag bits)
+            bool is_immediate = Utils::is_bit_set(opcode, 25);
+
+            uint32_t operand{};
+            if (is_immediate)
+            {
+                uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
+                int rotate = Utils::get_bits(opcode, 8, 12);
+                
+                operand = alu_ror(imm8, rotate * 2, false);
+            }
+            else
+                operand = arm_get_rm(opcode);
+
+            psr = (psr & ~byte_mask) | (operand & byte_mask);
+        }
+
+        if (!set_to_spsr && (byte_mask & 0xFF))
+        {
+            cpsr |= 0x10;
+            handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
+        }
 
         return;
     }
@@ -812,13 +802,30 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
     assert(Utils::get_bits(opcode, 26, 28) == 0b01);
 
     bool is_load = Utils::is_bit_set(opcode, 20); // L
+    std::cout << "Is Load: " << is_load << '\n';
     bool writeback_to_base = Utils::is_bit_set(opcode, 21); // W
+    std::cout << "Writeback to Base: " << writeback_to_base << '\n';
     bool is_byte = Utils::is_bit_set(opcode, 22); // B
+    std::cout << "Is Byte: " << is_byte << '\n';
     bool add_to_base = Utils::is_bit_set(opcode, 23); // U
+    std::cout << "Add to Base: " << add_to_base << '\n';
     bool add_before_transfer = Utils::is_bit_set(opcode, 24); // P
+    std::cout << "Add Before Transfer: " << add_before_transfer << '\n';
     bool is_register_offset = Utils::is_bit_set(opcode, 25); // I
+    std::cout << "Is Register Offset: " << is_register_offset << '\n';
 
-    auto [base_register, dst_src_register] = arm_get_rn_rd(opcode);
+    int src_dst_index = Utils::get_bits(opcode, 12, 16);
+    int base_index = Utils::get_bits(opcode, 16, 20);
+
+    std::cout << "Src/Dst Index: " << src_dst_index << '\n';
+    std::cout << "Base Index: " << base_index << '\n';
+
+    uint32_t& dst_src_register = *registers[src_dst_index];
+    uint32_t& base_register = *registers[base_index];
+
+    std::cout << "Src/Dst Register: " << dst_src_register << '\n';
+    std::cout << "Base Register: " << base_register << '\n';
+
 
     uint32_t offset{};
     if (!is_register_offset)
@@ -838,7 +845,9 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
         offset = decode_shift_operation(op2_register, shift_amount, shift_type);
     }
 
-    int offset_amount = (add_to_base) ? -offset : offset;
+    int offset_amount = (add_to_base) ? offset : -offset;
+    std::cout << "Offset Amount: " << offset_amount << '\n';
+
     uint32_t base_address = base_register;
 
     if (is_byte)
@@ -858,6 +867,11 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
         }
         else 
         {
+            // When R15 is the source register (Rd) of a register store (STR) instruction, 
+            // the sto  red value will be address of the instruction plus 12.
+            pc += 4;
+            is_branched = true;
+
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
@@ -877,16 +891,27 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                dst_src_register = memory.read32(base_address);
+                uint32_t val = memory.read32(base_address);
+                dst_src_register = (base_address & 3) ? 
+                    alu_ror(val, (base_address & 3) * 8, false) : 
+                    val;
             }
             else
             {
-                dst_src_register = memory.read32(base_address);
+                uint32_t val = memory.read32(base_address);
+                dst_src_register = (base_address & 3) ? 
+                    alu_ror(val, (base_address & 3) * 8, false) : 
+                    val;
                 base_address += offset_amount;
             }
         }
         else 
         {
+            // When R15 is the source register (Rd) of a register store (STR) instruction, 
+            // the stored value will be address of the instruction plus 12.
+            pc += 4;
+            is_branched = true;
+
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
@@ -900,8 +925,24 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
         }
     }
 
-    if (writeback_to_base)
-        base_register = base_address;
+    // Must handle src/dst index == base Index
+    if (src_dst_index == 15)
+    {
+        pc += 8;
+        is_branched = true;
+    }
+
+    if (writeback_to_base || !add_before_transfer)
+    {   
+        if (src_dst_index != base_index)
+            base_register = base_address;
+
+        if (base_index == 15)
+        {
+            pc += 8;
+            is_branched = true;
+        }
+    }
 }
 
 // 2S + 1N Cycles
@@ -912,10 +953,12 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     assert(Utils::get_bits(opcode, 24, 28) == 0b1111);
 
     /// @note The bottom 24 bits of the instruction are ignored by the processor
-    old_cpsr = cpsr;
-    handle_state_switch(CpuState::Arm);
-    handle_mode_switch(CpuMode::Supervisor);
+    handle_state_switch(ArmState::Arm);
+
+    spsr_svc = cpsr;
+    handle_mode_switch(ArmMode::Supervisor); 
     set_cpsr(ProgramStatusRegsiter::I, true);
+     
     get_link() = pc - 4;
     pc = Arm7VectorAddr::SWI + 8;
     is_branched = true;
@@ -929,11 +972,14 @@ void Arm7TDMI::arm_undefined(uint32_t opcode)
     assert(Utils::get_bits(opcode, 25, 28) == 0b011);
     assert(Utils::is_bit_set(opcode, 4));
 
-    old_cpsr = cpsr;
-    handle_state_switch(CpuState::Arm);
-    handle_mode_switch(CpuMode::Supervisor);
+    /// @note The bottom 24 bits of the instruction are ignored by the processor
+    handle_state_switch(ArmState::Arm);
+
+    spsr_svc = cpsr;
+    handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
+     
     get_link() = pc - 4;
-    pc = Arm7VectorAddr::UNDEFINED + 8;
+    pc = Arm7VectorAddr::SWI + 8;
     is_branched = true;
 }

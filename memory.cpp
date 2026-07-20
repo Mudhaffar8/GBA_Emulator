@@ -41,7 +41,7 @@ uint32_t Memory::read32(uint32_t address)
 uint8_t Memory::read8(uint32_t address)
 {
     // The memory map is so clean :o
-    switch(address & Utils::MSB32)
+    switch(address & 0xF000000)
     {
     case 0x0000000: return system_rom.at(address);
     case 0x2000000: return external_ram.at(address - 0x2000000);
@@ -66,7 +66,7 @@ uint8_t Memory::read8(uint32_t address)
     case 0xE000000: 
         return game_pak_sram.at(address - 0xE000000);
     
-    default: std::runtime_error("Invalid Read Address: " + +address);
+    default: throw std::runtime_error("Invalid Read Address: " + std::to_string(address));
     }
 
     return 0;
@@ -74,7 +74,7 @@ uint8_t Memory::read8(uint32_t address)
 
 void Memory::write8(uint8_t byte, uint32_t address)
 {
-    switch(address & Utils::MSB32)
+    switch(address & 0xF000000)
     {
     case 0x0000000: system_rom.at(address) = byte;
     case 0x2000000: external_ram.at(address - 0x2000000) = byte;
@@ -99,6 +99,6 @@ void Memory::write8(uint8_t byte, uint32_t address)
     case 0xE000000: 
         game_pak_sram.at(address - 0xE000000) = byte;
     
-    default: std::runtime_error("Invalid Write Address: " + +address);
+    default: throw std::runtime_error("Invalid Write Address: " + std::to_string(address));
     }
 }
