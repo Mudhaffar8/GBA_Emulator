@@ -8,6 +8,7 @@
 #include <type_traits>
 
 #include "arm7.hpp"
+#include "utils.hpp"
 #include "memory.hpp"
 
 #include "json.hpp"
@@ -17,12 +18,6 @@ using json = nlohmann::json;
 class GBATests
 {
 public:
-
-    /// @brief Compares two values and throws an exception if they differ.
-    /// @tparam T type of values being compared. Must support equality comparison.
-    /// @param val Value being checked.
-    /// @param other_val Value compared against.
-    /// @throws `std::runtime_error` thrown when values are not equal
     template<typename T, bool print_bits = false>
     static void check_val(T val, T other_val, std::string name)
     {   
@@ -43,20 +38,7 @@ public:
         }
     }
 
-    /// @brief Converts integer into hexidecimal string representation.
-    /// @param num The integer value to convert.
-    /// @return A lowercase hexadecimal string representing the input number.
-    static std::string int_to_hex(int num)
-    {
-        std::stringstream stream;
-
-        if (num < 0x10) stream << "0";
-        stream << std::hex << num;
-
-        return stream.str();
-    }
-
-    static void run_test(Arm7TDMI& cpu, FakeMemory& mem, std::string file_name)
+    static void run_test(Arm7TDMI& cpu, TestMemory& mem, std::string file_name)
     {  
         std::ifstream file("./v1/" + file_name);
         if (!file) 
@@ -65,7 +47,7 @@ public:
             return;
         }
 
-        std::cout << "Parsing...\n";
+        std::cout << "Parsing file: " << file_name << "...\n";
 
         json data = json::parse(file);   
 

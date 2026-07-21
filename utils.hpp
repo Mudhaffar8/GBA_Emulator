@@ -1,11 +1,20 @@
 #pragma once
 
-#include <cstdint>
 #include <bitset>
+#include <cstdint>
+#include <string_view>
 
 namespace Utils
 {
     constexpr uint32_t MSB32 = 0x80000000;
+    constexpr bool DEBUG_MODE = true;
+
+    template <typename T>
+    constexpr void log(std::string_view name, T val)
+    {
+        if constexpr (DEBUG_MODE) 
+            std::cout << name << ": " << val << '\n';
+    }
     
     inline bool is_bit_set(uint32_t byte, uint32_t bit_to_check)
     {   

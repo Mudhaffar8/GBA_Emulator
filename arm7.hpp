@@ -26,7 +26,7 @@ namespace Arm7VectorAddr
 class Arm7TDMI 
 {
 public:
-    Arm7TDMI(FakeMemory& memory);
+    Arm7TDMI(TestMemory& memory);
 
     void tick();
     void test();
@@ -90,7 +90,7 @@ private:
     using ArmFunc = void (Arm7TDMI::*)(uint32_t opcode);
     using ThumbFunc = void (Arm7TDMI::*)(uint16_t opcode);
 
-    FakeMemory& memory;
+    TestMemory& memory;
 
     std::array<ArmFunc, 4096> arm_instr_table = generate_arm_table();
     std::array<ThumbFunc, 256> thumb_instr_table = generate_thumb_table();
@@ -228,14 +228,14 @@ private:
         int dst_reg_index = Utils::get_bits(opcode, 12, 16);
         int src_reg_index = Utils::get_bits(opcode, 16, 20);
 
-        std::cout << "Destination Idx: " << dst_reg_index << '\n';
-        std::cout << "Source Idx: " << src_reg_index << '\n';
+        Utils::log("Dst Index", dst_reg_index);
+        Utils::log("Src Index", src_reg_index);
 
         uint32_t& dest_register = *registers[dst_reg_index];
         uint32_t& src_register = *registers[src_reg_index];
 
-        std::cout << "Dest Register Value: " << dest_register << '\n';
-        std::cout << "Src Register Value: " << src_register << '\n';
+        Utils::log("Dst Register", dest_register);
+        Utils::log("Srx Register", src_register);
 
         return {src_register, dest_register};
     }
@@ -244,8 +244,10 @@ private:
     inline uint32_t& arm_get_rm(uint32_t opcode)
     {
         int rm_index = Utils::get_bits(opcode, 0, 4);
-        std::cout << "Rm Idx: " << rm_index << '\n';
-        std::cout << "Rm Contents: " << *registers[rm_index] << '\n';
+        
+        Utils::log("Rm Idx", rm_index);
+        Utils::log("Rm Contents", *registers[rm_index]);
+
         return *registers[rm_index];
     }
 
@@ -253,8 +255,10 @@ private:
     inline uint32_t& arm_get_rs(uint32_t opcode)
     {
         int rs_index = Utils::get_bits(opcode, 8, 12);
-        std::cout << "rs Idx: " << rs_index << '\n';
-        std::cout << "Rs Contents: " << *registers[rs_index] << '\n';
+
+        Utils::log("Rs Idx", rs_index);
+        Utils::log("Rs Contents", *registers[rs_index]);
+
         return *registers[rs_index];
     }
 
@@ -264,14 +268,14 @@ private:
         int dst_reg_index = Utils::get_bits(opcode, 0, 3);
         int src_reg_index = Utils::get_bits(opcode, 3, 6);
 
-        // std::cout << "Destination Idx: " << dst_reg_index << '\n';
-        // std::cout << "Source Idx: " << src_reg_index << '\n';
+        Utils::log("Dst Index", dst_reg_index);
+        Utils::log("Src Index", src_reg_index);
 
         uint32_t& dest_register = *registers[dst_reg_index];
         uint32_t& src_register = *registers[src_reg_index];
 
-        // std::cout << "Dest Register Value: " << dest_register << '\n';
-        // std::cout << "Src Register Value: " << src_register << '\n';
+        Utils::log("Dst Register", dest_register);
+        Utils::log("Src Register", src_register);
 
         return {dest_register, src_register};
     }
@@ -279,8 +283,11 @@ private:
     inline uint32_t& thumb_get_dst(uint16_t opcode) const
     {
         int dst_reg_index = Utils::get_bits(opcode, 8, 11);
-        // std::cout << "Destination Idx: " << dst_reg_index << '\n';
         uint32_t& dest_register = *registers[dst_reg_index];
+
+        Utils::log("Dst Index", dst_reg_index);
+        Utils::log("Dst Register", dest_register);
+
         return dest_register;
     }
 

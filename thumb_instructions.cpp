@@ -6,15 +6,16 @@
 // Passes all Tests
 void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 {
-    // std::cout << "THUMB Add Offset SP\n";
+    std::cout << "THUMB Add Offset SP\n";
     /// @note The condition codes are not set by this instruction.
     assert(Utils::get_bits(opcode, 8, 16) == 0b1011'0000);
 
-    // std::cout << "SP Before: " << *registers[13] << '\n';
+    Utils::log("SP Before", get_sp());
+    
     uint32_t immediate9 = Utils::get_bits(opcode, 0, 7) << 2;
     bool is_sub = Utils::is_bit_set(opcode, 7);
-    // std::cout << "Immediate: " << immediate9 << '\n';
-    // std::cout << "Is Sub: " << is_sub << '\n';
+    Utils::log("Immediate", immediate9);
+    Utils::log("Is Sub", is_sub);
 
     get_sp() = (is_sub) ? 
         get_sp() - immediate9 : 
@@ -751,6 +752,6 @@ void Arm7TDMI::thumb_undefined(uint16_t opcode)
     set_cpsr(ProgramStatusRegsiter::I, true);
      
     get_link() = pc - 2;
-    pc = Arm7VectorAddr::SWI + 8;
+    pc = Arm7VectorAddr::UNDEFINED + 8;
     is_branched = true;
 }

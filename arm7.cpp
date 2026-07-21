@@ -4,7 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 
-Arm7TDMI::Arm7TDMI(FakeMemory& _memory) : 
+Arm7TDMI::Arm7TDMI(TestMemory& _memory) : 
     memory(_memory)
 {}
 
@@ -52,7 +52,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     cpsr |= new_mode;
 
     std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
-
+    std::cout << "Mode Switch: ";
     switch(new_mode)
     {
     case ArmMode::User:
@@ -123,6 +123,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     default:
+        // MSR Transfer Tests sets the PSR to illegal modes so leave this commented for now
         // throw std::runtime_error("Invalid Mode: " + std::to_string(new_mode));
         break;
     }

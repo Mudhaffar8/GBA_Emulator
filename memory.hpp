@@ -41,10 +41,10 @@ private:
 
 // ------------------------------------------
 
-class FakeMemory 
+class TestMemory 
 {
 public:
-    FakeMemory() {}
+    TestMemory() {}
     
     uint8_t read8(uint32_t address) 
     { 
@@ -58,13 +58,11 @@ public:
 
     void write8(uint8_t byte, uint32_t address) 
     {
-        std::cout << "Wrote byte " << std::dec << +byte << " @ " << address << '\n';
         memory.insert_or_assign(address, byte);
     }
 
     void write16(uint16_t half_word, uint32_t address)
     {
-        std::cout << "Wrote half word " << half_word << " @ " << address << '\n';
         write8(half_word & 0xFF, address);
         write8((half_word >> 8) & 0xFF, address + 1);
     }
