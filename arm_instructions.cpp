@@ -661,6 +661,7 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 
     if (Utils::get_bits(opcode, 16, 22) == 0b001111)
     {
+        std::cout << "MRS Transfer\n";
         // MRS (transfer PSR contents to a register)
         int dst_reg_index = Utils::get_bits(opcode, 12, 16);
         uint32_t& dest_register = *registers[dst_reg_index];
@@ -672,75 +673,66 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
     }
     else 
     {
+        if (set_to_spsr && !mode_has_spsr())
+            return;
+
+        bool is_immediate = Utils::is_bit_set(opcode, 25);
+        std::cout << "Is Immediate: " << is_immediate << '\n';
+
         uint32_t byte_mask = Utils::is_bit_set(opcode, 16) ? 0xFF : 0;
         byte_mask |= Utils::is_bit_set(opcode, 17) ? 0x0000FF00 : 0;
         byte_mask |= Utils::is_bit_set(opcode, 18) ? 0x00FF0000 : 0;
         byte_mask |= Utils::is_bit_set(opcode, 19) ? 0xFF000000 : 0;
         std::cout << "Byte Mask: 0x" << std::hex << byte_mask << '\n';
 
-        if (Utils::get_bits(opcode, 4, 8) == 0)
-        {
-            std::cout << "User Mode: " << !is_privileged_mode() << '\n';
-            std::cout << "MSR (transfer register contents to PSR)\n";
-            // MSR (transfer register contents to PSR)
-            uint32_t src_register = arm_get_rm(opcode); 
-            std::cout << "Src Register: " << std::bitset<32>(src_register) << '\n';
-            
-            if (src_register & 0x0FFFFF00) // UnallocMask
-                std::cout << "UNPREDICTBLE\n";
+        uint32_t mask = (!is_privileged_mode()) ? byte_mask & 0xFF000000 : byte_mask;
+        uint32_t operand{};
 
-            if (set_to_spsr && !mode_has_spsr())
-                return;
+        if (is_immediate)
+        {
+            std::cout << "MSR (Immediate)\n";
+            // MSR (transfer register contents or imm val to PSR flag bits)
+
+            uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
+            int rotate = Utils::get_bits(opcode, 8, 12);
+            
+            operand = alu_ror(imm8, rotate * 2, false);
+            std::cout << "Operand: " << std::bitset<32>(imm8) << '\n';
+            psr = (psr & ~mask) | (operand & mask);
+        }
+        else
+        {
+            std::cout << "MSR (Register Operands)\n";
+
+            // MSR (transfer register contents to PSR)
+            operand = arm_get_rm(opcode); 
+            std::cout << "Src Register: " << std::bitset<32>(operand) << '\n';
+            
+            if (operand & 0x0FFFFF00) // UnallocMask
+                std::cout << "UNPREDICTBLE\n";
             
             // In non-privileged mode (user mode): only condition 
             // code bits of CPSR can be changed, control bits can’t.
-            uint32_t mask = (!is_privileged_mode()) ? byte_mask & 0xFF000000 : byte_mask;
             std::cout << "Mask: " << std::bitset<16>(mask) << '\n';
-            std::cout << "Result: " << std::bitset<16>(src_register & mask) << '\n';
+            std::cout << "Result: " << std::bitset<16>(operand & mask) << '\n';
 
-            psr &= ~mask;
-            std::cout << "PSR after mask: " << std::bitset<32>(psr) << '\n';
-            psr |= (src_register & mask);
-            std::cout << "PSR after src register: " << std::bitset<32>(psr) << '\n';
-            
             // Why is bit 4 not set here? huh?
+            // For one of the SPSRs
             // 01010000000000000001001001100111 <-- Expected
             // 01010000000000000001001001110111 <-- What I got
 
             /// @note should probably look into the behaviour for when
             /// the mode bits are set to an invalid mode number
         }
-        else if (Utils::get_bits(opcode, 12, 22) == 0)
-        {
-            std::cout << "MSR (transfer register contents or imm val to PSR flag bits)\n";
-            // MSR (transfer register contents or imm val to PSR flag bits)
-            bool is_immediate = Utils::is_bit_set(opcode, 25);
 
-            uint32_t operand{};
-            if (is_immediate)
-            {
-                uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
-                int rotate = Utils::get_bits(opcode, 8, 12);
-                
-                operand = alu_ror(imm8, rotate * 2, false);
-            }
-            else
-                operand = arm_get_rm(opcode);
-
-            psr = (psr & ~byte_mask) | (operand & byte_mask);
-        }
+        psr = (psr & ~mask) | (operand & mask);
 
         if (!set_to_spsr && (byte_mask & 0xFF))
         {
             cpsr |= 0x10;
             handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
         }
-
-        return;
     }
-
-    std::cout << "Invalid Opcode: " << std::bitset<32>(opcode) << '\n';
-    assert(false);
 }
 
 // 2S + 1N + 1I
@@ -826,7 +818,6 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
     std::cout << "Src/Dst Register: " << dst_src_register << '\n';
     std::cout << "Base Register: " << base_register << '\n';
 
-
     uint32_t offset{};
     if (!is_register_offset)
         offset = Utils::get_bits(opcode, 0, 12);
@@ -868,9 +859,12 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
         else 
         {
             // When R15 is the source register (Rd) of a register store (STR) instruction, 
-            // the sto  red value will be address of the instruction plus 12.
-            pc += 4;
-            is_branched = true;
+            // the store red value will be address of the instruction plus 12.
+            if (src_dst_index == 15)
+            {
+                pc += 4;
+                is_branched = true;
+            }
 
             if (add_before_transfer) 
             { 
@@ -909,8 +903,11 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
         {
             // When R15 is the source register (Rd) of a register store (STR) instruction, 
             // the stored value will be address of the instruction plus 12.
-            pc += 4;
-            is_branched = true;
+            if (src_dst_index == 15)
+            {
+                pc += 4;
+                is_branched = true;
+            }
 
             if (add_before_transfer) 
             { 
@@ -925,8 +922,7 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
         }
     }
 
-    // Must handle src/dst index == base Index
-    if (src_dst_index == 15)
+    if (src_dst_index == 15 && is_load)
     {
         pc += 8;
         is_branched = true;
@@ -936,13 +932,55 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
     {   
         if (src_dst_index != base_index)
             base_register = base_address;
+        else if (!is_load)
+            base_register = base_address;
 
         if (base_index == 15)
         {
-            pc += 8;
-            is_branched = true;
+            if (src_dst_index != base_index || !is_load)
+            {
+                pc += 12;
+                is_branched = true;
+            }
         }
     }
+
+    /* src == base && r15 edge case #1
+        ARM Single Data Transfer
+        Is Load: 0
+        Writeback to Base: 1
+        Is Byte: 1
+        Add to Base: 1
+        Add Before Transfer: 0
+        Is Register Offset: 0
+        Src/Dst Index: 15
+        Base Index: 15
+        Src/Dst Register: 49610404
+        Base Register: 49610404
+        Offset Amount: 3949
+        Wrote byte 168 @ 49610404
+        R15 Expected: 49614365 Got: 49614353
+    */
+    /*
+        First adds 12-bit offset, second doesn't
+        first is load, other is not
+        first adds to base, other does not
+    */
+    /* src == base && r15 edge case #2
+        ARM Single Data Transfer
+        Is Load: 1
+        Writeback to Base: 1
+        Is Byte: 1
+        Add to Base: 0
+        Add Before Transfer: 0
+        Is Register Offset: 0
+        Src/Dst Index: 15
+        Base Index: 15
+        Src/Dst Register: 2411502916
+        Base Register: 2411502916
+        Offset Amount: -245
+        R15 Expected: 162 Got: 174
+    */
 }
 
 // 2S + 1N Cycles

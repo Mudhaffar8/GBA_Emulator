@@ -21,13 +21,9 @@ int main()
     // GBATests::run_test(cpu, memory, "arm_data_proc_immediate_shift.json");
     // GBATests::run_test(cpu, memory, "arm_data_proc_register_shift.json");
     // GBATests::run_test(cpu, memory, "arm_mrs.json");
-    // GBATests::run_test(cpu, memory, "arm_msr_reg.json");    
-
-    // 11110000000000000000000011010011 <-- Initial
-    // 10111010101101100000000011010011 <-- Expected
-    // 10111010101101101011000101000011 <-- Got
-    // Mode bits remain the same
-    // bits 31-16(ish) are changed
+    // GBATests::run_test(cpu, memory, "arm_msr_reg.json");  
+    // GBATests::run_test(cpu, memory, "arm_msr_imm.json");
+    // GBATests::run_test(cpu, memory, "arm_ldr_str_immediate_offset.json");    
 
     // Passes all THUMB Tests
     // GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");
