@@ -269,3 +269,85 @@ uint32_t Arm7TDMI::alu_mul(uint32_t op1, uint32_t op2, bool set_cc)
     }
     return result;
 }
+
+uint32_t Arm7TDMI::decode_shift_operation_arm(uint32_t op1, uint32_t shift_amount, int shift_type, bool set_condition_codes, bool update_carry_flag)
+{
+    switch(shift_type)
+    {
+    case 0: 
+        if (shift_amount == 32)
+        {
+            if (update_carry_flag)
+                set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 0));
+            return 0;
+        }
+        else if (shift_amount > 32)
+        {
+            if (update_carry_flag)
+                set_cpsr(ProgramStatusRegsiter::C, false);
+            return 0;
+        }
+        else 
+           return alu_lsl(op1, shift_amount, set_condition_codes, update_carry_flag);
+    case 1: 
+        if (shift_amount == 32)
+        {
+            if (update_carry_flag)
+                set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 31));
+            return 0;
+        }
+        else if (shift_amount > 32)
+        {
+            if (update_carry_flag)
+                set_cpsr(ProgramStatusRegsiter::C, false);
+            return 0;
+        }
+        else
+            return alu_lsr(op1, shift_amount, set_condition_codes, update_carry_flag);
+    case 2: 
+        if (shift_amount >= 32)
+        {
+            if (Utils::is_bit_set(op1, 31))
+            {
+                if (update_carry_flag)
+                    set_cpsr(ProgramStatusRegsiter::C, true);
+                return 0xFFFFFFFF;
+            }
+            else
+            {
+                if (update_carry_flag)
+                    set_cpsr(ProgramStatusRegsiter::C, false);
+                return 0;
+            }
+        }
+        else 
+            return alu_asr(op1, shift_amount, set_condition_codes, update_carry_flag);
+    case 3: 
+        // RRX
+        if (shift_amount == 0)
+        {
+            uint32_t result = op1;
+            
+            result >>= 1;
+            result |= (c_set() << 31);
+            if (update_carry_flag)
+                set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, 0));
+
+            return result;
+        }
+        else if (shift_amount > 32)
+        {
+            uint32_t shift_value = (shift_amount % 32);
+            if (shift_value == 0)  
+                shift_value = 32;
+            return alu_ror(op1, shift_value, set_condition_codes, update_carry_flag);
+        }
+        else 
+            return alu_ror(op1, shift_amount, set_condition_codes, update_carry_flag);
+        
+        default: 
+            throw std::runtime_error("Invalid Shift Opcode: " + std::to_string(shift_type));
+    }
+
+    return 0;
+}

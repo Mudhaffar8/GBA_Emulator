@@ -24,6 +24,8 @@ int main()
     // GBATests::run_test(cpu, memory, "arm_msr_reg.json");  
     // GBATests::run_test(cpu, memory, "arm_msr_imm.json");
     // GBATests::run_test(cpu, memory, "arm_ldr_str_immediate_offset.json");    
+    // GBATests::run_test(cpu, memory, "arm_ldr_str_register_offset.json");    
+    // GBATests::run_test(cpu, memory, "arm_ldrh_strh.json");    
 
     // Passes all THUMB Tests
     // GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");

@@ -172,6 +172,7 @@ private:
     uint32_t alu_ror(uint32_t op1, uint32_t op2, bool set_cc, bool set_carry = true);
     uint32_t alu_mul(uint32_t op1, uint32_t op2, bool set_cc);
     uint32_t decode_shift_operation(uint32_t op1, uint32_t op2, int shift_type, bool set_cc = true, bool set_carry = true);
+    uint32_t decode_shift_operation_arm(uint32_t op1, uint32_t op2, int shift_type, bool set_condition_codes, bool update_carry_flag);
 
     /* Branching */
     void branch_and_exchange(uint32_t address);
