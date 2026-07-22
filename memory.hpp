@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "utils.hpp"
+
 class Memory 
 {
 public:
@@ -69,7 +71,9 @@ public:
 
     void write32(uint32_t word, uint32_t address)
     {
-        std::cout << "Wrote word " << word << " @ " << address << '\n';
+        std::string str = "Wrote word " + std::to_string(word) + " @ " + std::to_string(address);
+        Utils::print(str);
+        
         write8(word & 0xFF, address);
         write8((word >> 8) & 0xFF, address + 1);
         write8((word >> 16) & 0xFF, address + 2);

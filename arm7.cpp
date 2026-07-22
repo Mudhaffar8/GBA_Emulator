@@ -46,18 +46,19 @@ bool Arm7TDMI::check_condition_code(uint32_t code)
     return false;
 }
 
+/// @note Any method that changes the cpsr flags should call this function.
 void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 {
     cpsr &= ~ProgramStatusRegsiter::Mode;
     cpsr |= new_mode;
 
-    std::cout << "New CPSR: " << std::bitset<32>(cpsr) << '\n';
-    std::cout << "Mode Switch: ";
+    Utils::log("New CPSR", std::bitset<32>(cpsr));
+    Utils::print("Mode Switch: ");
     switch(new_mode)
     {
     case ArmMode::User:
     case ArmMode::System:
-        std::cout << "USER/SYSTEM\n";
+        Utils::print("USER/SYSTEM\n");
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -68,7 +69,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case ArmMode::FastInterrupt:
-        std::cout << "FIQ\n";
+        Utils::print("FIQ\n");
         registers[8] = &r8_fiq;
         registers[9] = &r9_fiq;
         registers[10] = &r10_fiq;
@@ -79,7 +80,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case ArmMode::InterruptRequest:
-        std::cout << "IRQ\n";
+        Utils::print("IRQ\n");
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -90,7 +91,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case ArmMode::Supervisor:
-        std::cout << "SVC\n";
+        Utils::print("SVC\n");
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -101,7 +102,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case ArmMode::Abort:
-        std::cout << "ABT\n";
+        Utils::print("ABT\n");
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -112,7 +113,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
         break;
 
     case ArmMode::Undefined:
-        std::cout << "UND\n";
+        Utils::print("UND\n");
         registers[8] = &r8;
         registers[9] = &r9;
         registers[10] = &r10;
@@ -181,7 +182,6 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
     if (check_condition_code(condition_code))
     {
         int index = (Utils::get_bits(opcode, 20, 28) << 4) | Utils::get_bits(opcode, 4, 8);
-        std::cout << "Index: " << std::bitset<12>(index) << '\n';
         (this->*arm_instr_table[index])(opcode);
     }
 

@@ -261,7 +261,7 @@ uint32_t Arm7TDMI::alu_mul(uint32_t op1, uint32_t op2, bool set_cc)
     */
     skip_mult_instr = true;
     uint32_t result = op1 * op2;
-    std::cout << "Mult Result: " << result << '\n';
+    Utils::log("Mult Result", result);
     if (set_cc)
     {
         set_negative_and_zero(result);

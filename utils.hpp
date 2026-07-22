@@ -7,13 +7,19 @@
 namespace Utils
 {
     constexpr uint32_t MSB32 = 0x80000000;
-    constexpr bool DEBUG_MODE = true;
+    constexpr bool DEBUG_MODE = false;
 
     template <typename T>
     constexpr void log(std::string_view name, T val)
     {
         if constexpr (DEBUG_MODE) 
             std::cout << name << ": " << val << '\n';
+    }
+
+    constexpr void print(std::string_view what)
+    {
+        if constexpr (DEBUG_MODE) 
+            std::cout << what << '\n';
     }
     
     inline bool is_bit_set(uint32_t byte, uint32_t bit_to_check)

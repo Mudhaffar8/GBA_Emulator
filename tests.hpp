@@ -58,6 +58,7 @@ public:
         {
             ++number;
             cpu.skip_mult_instr = false;
+            cpu.skip_instr = false;
             
             cpu.cpsr = static_cast<uint32_t>((*it)["initial"]["CPSR"]);
             cpu.handle_mode_switch(cpu.cpsr & 0x1F);
@@ -111,17 +112,17 @@ public:
                 if (ram["size"] == 4) 
                 {
                     mem.write32(data, addr);
-                    std::cout << "^ Initialized!\n";
+                    Utils::print("^ Initialized!\n");
                 }
                 else if (ram["size"] == 2)
                 {
                     mem.write16(static_cast<uint16_t>(data), addr);
-                    std::cout << "^ Initialized!\n";
+                    Utils::print("^ Initialized!\n");
                 }
                 else if (ram["size"] == 1)
                 {
                     mem.write8(static_cast<uint8_t>(data), addr);
-                    std::cout << "^ Initialized!\n";
+                    Utils::print("^ Initialized!\n");
                 }
             }
             
@@ -195,7 +196,7 @@ public:
 
             mem.clear_memory();
 
-            std::cout << "\nPassed Test #" << std::dec << number << '\n';
+            std::cout << "Passed Test #" << std::dec << number << '\n';
         }
 
         std::cout << "Passed All Tests: " << file_name << '\n';

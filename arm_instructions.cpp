@@ -24,7 +24,7 @@ enum AluOps
 // 2S + 1N Incremental Cycles
 void Arm7TDMI::arm_branch(uint32_t opcode)
 {
-    std::cout << "ARM Branch & Branch w/ Link \n";
+    Utils::print("ARM Branch & Branch w/ Link \n");
     assert(Utils::get_bits(opcode, 25, 28) == 0b101);
 
     // Documentation says shift than sign extend but I don't think it makes a difference
@@ -42,7 +42,7 @@ void Arm7TDMI::arm_branch(uint32_t opcode)
 // 2S + 1N Cycles
 void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
 {
-    std::cout << "ARM Branch And Exchange\n";
+    Utils::print("ARM Branch And Exchange\n");
 
     assert(Utils::get_bits(opcode, 4, 28) == 0b0001'0010'1111'1111'1111'0001);
 
@@ -56,7 +56,7 @@ void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
 // Unused as GBA has no coprocessors
 void Arm7TDMI::arm_coprocessor_data_operation(uint32_t opcode) 
 {
-    std::cout << "ARM Coprocessor Data Operation\n";
+    Utils::print("ARM Coprocessor Data Operation\n");
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(!Utils::is_bit_set(opcode, 4));
@@ -64,14 +64,14 @@ void Arm7TDMI::arm_coprocessor_data_operation(uint32_t opcode)
 
 void Arm7TDMI::arm_coprocessor_data_transfer(uint32_t opcode) 
 {
-    std::cout << "ARM Coprocessor Data Transfer\n";
+    Utils::print("ARM Coprocessor Data Transfer\n");
     
     assert(Utils::get_bits(opcode, 25, 28) == 0b110);
 }
 
 void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode) 
 {
-    std::cout << "ARM Coprocessor Register Transfer\n";
+    Utils::print("ARM Coprocessor Register Transfer\n");
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(Utils::is_bit_set(opcode, 4));
@@ -79,7 +79,7 @@ void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode)
 
 void Arm7TDMI::arm_data_processing(uint32_t opcode)
 {
-    std::cout << "ARM Data Processing\n";
+    Utils::print("ARM Data Processing\n");
 
     assert(Utils::get_bits(opcode, 26, 28) == 0b00);
 
@@ -239,10 +239,15 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
 
 void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 {
-    std::cout << "ARM Block Data Transfer\n";
+    Utils::print("ARM Block Data Transfer\n");
 
-    // This instruction is going to break me :sob:
+    // This is taking years off my life
     assert(Utils::get_bits(opcode, 25, 28) == 0b100);
+
+    static const std::array<uint32_t*, 16> usr_registers = {
+        &r0, &r1, &r2, &r3, &r4, &r5, &r6, &r7,
+        &r8, &r9, &r10, &r11, &r12, &r13, &r14, &r15
+    };
 
     int base_register_index = Utils::get_bits(opcode, 16, 20);
     uint32_t& base_register = *registers[base_register_index];
@@ -270,85 +275,217 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
     Utils::log("Offset Amount", offset_amount);
 
+    bool use_usr_bank = load_psr_or_force_usr_mode && (!Utils::is_bit_set(register_list, 15) || !is_load);
+    auto& registers_to_transfer = (use_usr_bank) ? usr_registers : registers;
+
+    if (register_list == 0)
+    {
+        // Empty Rlist: R15 loaded/stored (ARMv4 only), and Rb=Rb+/-40h (ARMv4-v5).
+        *registers_to_transfer[base_register_index] += offset_amount * 16;
+
+        if (is_load)
+            pc = (memory.read32(*registers_to_transfer[base_register_index]) + 4);
+        else
+            memory.write32(pc + 4, *registers_to_transfer[base_register_index]);
+
+        return;
+    }
+
+    uint32_t address_to_write_to_base = address;
+    bool first_register = true;
+    bool base_is_first = true;
+
     if (is_load)
     {
-        for (int i = 0; i < 15; ++i)
+        for (int i = 0; i < 16; ++i)
         {
-            if (!Utils::is_bit_set(register_list, i)) 
+            // The lowest Register in Rlist (R0 if its in the list) will be 
+            // loaded/stored to/from the lowest memory address.
+            int index = (add_offset_to_base) ? i : 15 - i;
+            if (!Utils::is_bit_set(register_list, index)) 
                 continue;
-
+        
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                *registers[i] = memory.read32(address);
+                *registers_to_transfer[index] = memory.read32(address);
             }
             else
             {
-                *registers[i] = memory.read32(address);
+                *registers_to_transfer[index] = memory.read32(address);
                 address += offset_amount;
+            }
+
+            if (index == 15)
+            {
+                pc += 8;
+                is_branched = true;
             }
         }  
-
-        if (Utils::is_bit_set(register_list, 15))
-        {
-            if (add_offset_before_transfer) 
-            { 
-                address += offset_amount;
-                pc = memory.read32(address);
-            }
-            else
-            {
-                pc = memory.read32(address);
-                address += offset_amount;
-            }
-        }
-
-        if (load_psr_or_force_usr_mode)
-            cpsr = get_mode_spsr(get_curr_mode());
     }
     else
     {
-        for (int i = 0; i < 15; ++i)
+        pc += 4;
+        is_branched = true;
+
+
+        for (int i = 0; i < 16; ++i)
         {
-            if (!Utils::is_bit_set(register_list, i)) continue;
+            int index = (add_offset_to_base) ? i : 15 - i;
+            if (!Utils::is_bit_set(register_list, index)) 
+                continue;
+
+            if (index == base_register_index)
+            {
+                base_is_first = first_register;
+                address_to_write_to_base = address + (add_offset_before_transfer ? offset_amount : 0);
+            }
+            first_register = false;
 
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                memory.write32(*registers[i], address);
+                memory.write32(*registers_to_transfer[index], address);
             }
             else
             {
-                memory.write32(*registers[i], address);
+                memory.write32(*registers_to_transfer[index], address);
                 address += offset_amount;
             }
-        }  
-
-        if (Utils::is_bit_set(register_list, 15))
-        {
-            if (add_offset_before_transfer) 
-            { 
-                address += offset_amount;
-                memory.write32(pc, address);
-            }
-            else
-            {
-                memory.write32(pc, address);
-                address += offset_amount;
-            }
-        }
-
-        if (load_psr_or_force_usr_mode)
-            cpsr = get_mode_spsr(get_curr_mode());          
+        }       
     }
 
-    if (writeback_to_base || !add_offset_before_transfer)
-        base_register = address;
+    if (load_psr_or_force_usr_mode && Utils::is_bit_set(register_list, 15) && is_load)
+    {
+        // LDM Rn,…,PC on ARMv4 leaves CPSR.T unchanged.
+        cpsr = get_mode_spsr(get_curr_mode());
+        handle_state_switch(cpsr & ProgramStatusRegsiter::Mode);
+    }
+
+    /*
+    When write-back is specified, the base is written back at the end of the second cycle of 
+    the instruction. During a STM, the first register is written out at the start of the second 
+    cycle. A STM which includes storing the base, with the base as the first register to be 
+    stored, will therefore store the unchanged value, whereas with the base second or later 
+    in the transfer order, will store the modified value.
+    */
+    Utils::log("Base is first", base_is_first);
+    Utils::log("Address to write to base", address_to_write_to_base);
+
+    if (writeback_to_base) 
+    {
+        // A LDM will always overwrite the updated base if the base is in the list. 
+        if (is_load)
+        {
+            if (!Utils::is_bit_set(register_list, base_register_index))
+            {
+                *registers_to_transfer[base_register_index] = address;
+                
+                // Pipeline Flush
+                if (base_register_index == 15)
+                {
+                    pc += 8;
+                    is_branched = true;
+                }
+            }
+        }
+        else
+        {
+            /// @note There's may be an issue with which register list to use
+            /// (Either User registers or the registers from the current mode)
+            /// Could also be caused by the CPSR mode switching at the start
+            *registers_to_transfer[base_register_index] = address;
+            Utils::log("Final Base Register", *registers_to_transfer[base_register_index]);
+            // I think the transfer order is wrong
+            // I think it goes from 0 to 14 regardles off add_to_offset
+            bool local_base_first = true;
+            for (int i = 0; i <= 16; ++i)
+            {
+                if (Utils::is_bit_set(register_list, i))
+                {
+                    local_base_first = i == base_register_index;
+                    break;
+                }
+            }
+            Utils::log("Local Base Is First", local_base_first);
+            if (!local_base_first && Utils::is_bit_set(register_list, base_register_index))
+                memory.write32(address, address_to_write_to_base);
+
+            // Pipeline Flush
+            if (base_register_index == 15)
+            {
+                pc += 8;
+                is_branched = true;
+            }
+        }
+    }
+
+    // STM is unbelievably scuffed
 }
 
+/*
+    ARM Block Data Transfer
+    Base Register Index: 15
+    Base Register: 1310087728
+    Register List: 1101011111001101
+    Add Before Transfer: 0
+    Add to Offset: 0
+    Load PSR Or Force USR Mode: 0
+    Writeback to Base: 1
+    Is Load: 0
+    Offset Amount: -4
+    Register 15, Wrote word 1310087732 @ 1310087728
+    Register 14, Wrote word 3927456793 @ 1310087724
+    Register 12, Wrote word 252784362 @ 1310087720
+    Register 10, Wrote word 4045167113 @ 1310087716
+    Register 9, Wrote word 1252012097 @ 1310087712
+    Register 8, Wrote word 3286281369 @ 1310087708
+    Register 7, Wrote word 151937067 @ 1310087704
+    Register 6, Wrote word 583068934 @ 1310087700
+    Register 3, Wrote word 1082351317 @ 1310087696
+    Register 2, Wrote word 1839655083 @ 1310087692
+    Register 0, Wrote word 3664913581 @ 1310087688
+    Base is first: 1
+    Address to write to base: 1310087728
+    Final Base Register: 1310087684
+    word @ 1310087728 Expected: 1310087684 Got: 1310087732
+*/
+/*
+    Similarities: 
+        Base is First
+        Both expect updated value to be written to memory address
+        Load PSR Or Force USR Mode: 0
+
+*/
+/*
+    New CPSR: 01110000000000000000000011010000
+    Mode Switch: USER/SYSTEM
+    Index: 100100101101
+    ARM Block Data Transfer
+    Base Register Index: 14
+    Base Register: 1801935581
+    Register List: 0110100011011000
+    Add Before Transfer: 1
+    Add to Offset: 0
+    Load PSR Or Force USR Mode: 0
+    Writeback to Base: 1
+    Is Load: 0
+    Offset Amount: -4
+    Register 14, Wrote word 1801935581 @ 1801935577
+    Register 13, Wrote word 372889274 @ 1801935573
+    Register 11, Wrote word 1963475339 @ 1801935569
+    Register 7, Wrote word 2819620844 @ 1801935565
+    Register 6, Wrote word 433404757 @ 1801935561
+    Register 4, Wrote word 2001625075 @ 1801935557
+    Register 3, Wrote word 784512997 @ 1801935553
+    Base is first: 1
+    Address to write to base: 1801935577
+    Final Base Register: 1801935553
+    word @ 1801935577 Expected: 1801935553 Got: 1801935581
+*/
 void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 {
-    std::cout << "ARM Halfword Data Transfer\n";
+    Utils::print("ARM Halfword Data Transfer\n");
 
     assert(Utils::get_bits(opcode, 25, 28) == 0);
     assert(Utils::is_bit_set(opcode, 7));
@@ -387,8 +524,9 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
         arm_get_rm(opcode);
         
     int total_offset = (add_to_offset) ? offset_amount : -offset_amount;
-    Utils::log("Offset Amount", total_offset);
     uint32_t base_address = base_register;
+
+    Utils::log("Offset Amount", total_offset);
     Utils::log("Base Address", base_address);
 
     if (sh_flag == 0b01) // Unsigned Halfwords
@@ -529,7 +667,7 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 
 void Arm7TDMI::arm_multiply(uint32_t opcode)
 {
-    std::cout << "ARM Multiply\n";
+    Utils::print("ARM Multiply\n");
 
     assert(Utils::get_bits(opcode, 22, 28) == 0);
     assert(Utils::get_bits(opcode, 4, 8) == 0b1001);
@@ -579,7 +717,7 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
 
 void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 {
-    std::cout << "ARM Multiply Long\n";
+    Utils::print("ARM Multiply Long\n");
 
     assert(Utils::get_bits(opcode, 23, 28) == 1);
     assert(Utils::get_bits(opcode, 4, 8) == 0b1001);
@@ -645,7 +783,7 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 
 void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 {
-    std::cout << "ARM PSR Transfer\n";
+    Utils::print("ARM PSR Transfer\n");
 
     assert(Utils::get_bits(opcode, 26, 28) == 0b00);
     assert(Utils::get_bits(opcode, 23, 25) == 0b10);
@@ -658,7 +796,7 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 
     if (Utils::get_bits(opcode, 16, 22) == 0b001111)
     {
-        std::cout << "MRS Transfer\n";
+        Utils::print("MRS Transfer\n");
         // MRS (transfer PSR contents to a register)
         int dst_reg_index = Utils::get_bits(opcode, 12, 16);
         uint32_t& dest_register = *registers[dst_reg_index];
@@ -687,7 +825,7 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 
         if (is_immediate)
         {
-            std::cout << "MSR (Immediate)\n";
+            Utils::print("MSR (Immediate)\n");
             // MSR (transfer register contents or imm val to PSR flag bits)
 
             uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
@@ -700,14 +838,14 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
         }
         else
         {
-            std::cout << "MSR (Register Operands)\n";
+            Utils::print("MSR (Register Operands)\n");
 
             // MSR (transfer register contents to PSR)
             operand = arm_get_rm(opcode); 
             Utils::log("Src Register", std::bitset<32>(operand));
             
             if (operand & 0x0FFFFF00) // UnallocMask
-                std::cout << "UNPREDICTBLE\n";
+                Utils::print("UNPREDICTBLE\n");
             
             // In non-privileged mode (user mode): only condition 
             // code bits of CPSR can be changed, control bits can’t.
@@ -736,7 +874,7 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 // 2S + 1N + 1I
 void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 {
-    std::cout << "ARM Single Data Swap\n";
+    Utils::print("ARM Single Data Swap\n");
 
     assert(Utils::get_bits(opcode, 23, 28) == 0b00010);
     assert(Utils::get_bits(opcode, 20, 22) == 0b00);
@@ -787,7 +925,7 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 
 void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 {
-    std::cout << "ARM Single Data Transfer\n";
+    Utils::print("ARM Single Data Transfer\n");
 
     assert(Utils::get_bits(opcode, 26, 28) == 0b01);
 
@@ -939,7 +1077,7 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 // 2S + 1N Cycles
 void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
 {
-    std::cout << "ARM Software Interrupt\n";
+    Utils::print("ARM Software Interrupt\n");
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1111);
 
@@ -958,7 +1096,7 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
 // 2S + 1I + 1N cycles
 void Arm7TDMI::arm_undefined(uint32_t opcode)
 {
-    std::cout << "ARM Undefined\n";
+    Utils::print("ARM Undefined\n");
 
     assert(Utils::get_bits(opcode, 25, 28) == 0b011);
     assert(Utils::is_bit_set(opcode, 4));
