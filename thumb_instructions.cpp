@@ -6,7 +6,8 @@
 // Passes all Tests
 void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 {
-    std::cout << "THUMB Add Offset SP\n";
+    Utils::print("THUMB Add Offset SP\n");
+
     /// @note The condition codes are not set by this instruction.
     assert(Utils::get_bits(opcode, 8, 16) == 0b1011'0000);
 
@@ -25,7 +26,7 @@ void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
 {    
-    // std::cout << "THUMB Add Subtract\n";
+    Utils::print("THUMB Add Subtract\n");
 
     assert(Utils::get_bits(opcode, 11, 16) == 0b00011);
 
@@ -44,7 +45,7 @@ void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
 
 void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 {
-    // std::cout << "THUMB ALU Operations\n";
+    Utils::print("THUMB ALU Operations\n");
 
     assert(Utils::get_bits(opcode, 10, 16) == 0b010000);
 
@@ -169,7 +170,7 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
 {
-    // std::cout << "THUMB Conditional Branch\n";
+    Utils::print("THUMB Conditional Branch\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1101);
 
@@ -185,7 +186,7 @@ void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
 
 void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
 {
-    // std::cout << "THUMB HI Reg Operations/Branch Exchange\n";
+    Utils::print("THUMB HI Reg Operations/Branch Exchange\n");
 
     assert(Utils::get_bits(opcode, 10, 16) == 0b010'001);
 
@@ -233,7 +234,7 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
 
 void Arm7TDMI::thumb_load_address(uint16_t opcode)
 {
-    // std::cout << "THUMB Load Address\n";
+    Utils::print("THUMB Load Address\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1010);
 
@@ -262,7 +263,7 @@ void Arm7TDMI::thumb_load_address(uint16_t opcode)
 
 void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 { 
-    // std::cout << "THUMB Load Store Halfword\n";
+    Utils::print("THUMB Load Store Halfword\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1000);
 
@@ -291,7 +292,7 @@ void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 
 void Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
 {
-    // std::cout << "THUMB Load Store Immediate\n";
+    Utils::print("THUMB Load Store Immediate\n");
 
     assert(Utils::get_bits(opcode, 13, 16) == 0b011);
 
@@ -331,11 +332,11 @@ void Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
 
 void Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t opcode)
 {
+    Utils::print("THUMB Load Store Sign-Extended Halfword/Byte\n");
+
     assert(Utils::get_bits(opcode, 12, 16) == 0b0101);
     assert(Utils::is_bit_set(opcode, 9));
     
-    // std::cout << "THUMB Load Store Sign-Extended Halfword/Byte\n";
-
     auto [dst_register, base_register] = thumb_get_dst_src(opcode);
 
     int offset_reg_index = Utils::get_bits(opcode, 6, 9);
@@ -376,7 +377,7 @@ void Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t opcode)
 
 void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
 {
-    // std::cout << "THUMB Load Store w/ Register Offset\n";
+    Utils::print("THUMB Load Store w/ Register Offset\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b0101);
     assert(!Utils::is_bit_set(opcode, 9));
@@ -420,7 +421,7 @@ void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
 
 void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 {
-    // std::cout << "THUMB Long Branch w/ Link\n";
+    Utils::print("THUMB Long Branch w/ Link\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1111);
 
@@ -447,7 +448,7 @@ void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
 {
-    // std::cout << "THUMB MOV/CMP/ADD/SUB Immediate\n";
+    Utils::print("THUMB MOV/CMP/ADD/SUB Immediate\n");
 
     assert(Utils::get_bits(opcode, 13, 16) == 0b001);
 
@@ -475,7 +476,7 @@ void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
 
 void Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
 {
-    // std::cout << "THUMB Move Shifted Register\n";
+    Utils::print("THUMB Move Shifted Register\n");
 
     assert(Utils::get_bits(opcode, 13, 16) == 0b000);
 
@@ -495,7 +496,7 @@ void Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
 
 void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 {
-    // std::cout << "THUMB Multiple Load Store\n";
+    Utils::print("THUMB Multiple Load Store\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1100);
 
@@ -578,7 +579,7 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 // Passes all Tests
 void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
 {
-    // std::cout << "THUMB PC Relative Load\n";
+    Utils::print("THUMB PC Relative Load\n");
 
     assert(Utils::get_bits(opcode, 11, 16) == 0b01001);
     // Add unsigned offset (255 words,
@@ -600,7 +601,7 @@ void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
 
 void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
 {
-    // std::cout << "THUMB PUSH/POP Registers\n";
+    Utils::print("THUMB PUSH/POP Registers\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1011);
     assert(Utils::get_bits(opcode, 9, 11) == 0b10);
@@ -681,7 +682,7 @@ Final:
 
 void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 {
-    std::cout << "THUMB Software Interrupt\n";
+    Utils::print("THUMB Software Interrupt\n");
 
     assert(Utils::get_bits(opcode, 8, 16) == 0b1101'1111);
 
@@ -700,7 +701,7 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 
 void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
 {
-    // std::cout << "THUMB SP Relative Load/Store\n";
+    Utils::print("THUMB SP Relative Load/Store\n");
 
     assert(Utils::get_bits(opcode, 12, 16) == 0b1001);
 
@@ -731,7 +732,7 @@ void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
 // Passes All Tests
 void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
 {
-    // std::cout << "THUMB Unconditional Branch\n";
+    Utils::print("THUMB Unconditional Branch\n");
 
     assert(Utils::get_bits(opcode, 11, 16) == 0b11100);
     
@@ -743,7 +744,7 @@ void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
 
 void Arm7TDMI::thumb_undefined(uint16_t opcode)
 {
-    // std::cout << "THUMB Undefined\n";
+    Utils::print("THUMB Undefined\n");
 
     handle_state_switch(ArmState::Arm);
 
