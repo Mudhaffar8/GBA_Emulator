@@ -8,18 +8,43 @@ Arm7TDMI::Arm7TDMI(TestMemory& _memory) :
     memory(_memory)
 {}
 
-void Arm7TDMI::test()
-{
-    for (uint16_t op = 0; op < 256; ++op)
-    {
-        // std::cout << "Opcode: " << std::bitset<16>(op << 8) << ", ";
-        thumb_execute(op << 8);
-    }
-}   
-
 void Arm7TDMI::tick()
-{}
+{
+    if (is_thumb_mode())
+    {
+        uint16_t half_word = memory.read16(pc - 4);
+        thumb_execute(half_word);
+    }
+    else
+    {
+        uint32_t word = memory.read32(pc - 8);
+        arm_execute(word);
+    }
+}
 
+void Arm7TDMI::arm_execute(uint32_t opcode)
+{
+    is_branched = false;
+
+    uint32_t condition_code = Utils::get_bits(opcode, 28, 32);
+    if (check_condition_code(condition_code))
+    {
+        int index = (Utils::get_bits(opcode, 20, 28) << 4) | Utils::get_bits(opcode, 4, 8);
+        (this->*arm_instr_table[index])(opcode);
+    }
+
+    if (!is_branched)
+        pc += 4;
+}
+
+void Arm7TDMI::thumb_execute(uint16_t opcode)
+{
+    is_branched = false;
+    (this->*thumb_instr_table[opcode >> 8])(opcode);
+
+    if (!is_branched)
+        pc += 2;
+}
 
 bool Arm7TDMI::check_condition_code(uint32_t code)
 {
@@ -40,7 +65,7 @@ bool Arm7TDMI::check_condition_code(uint32_t code)
         case ConditionCode::GT: return !z_set() && !(n_set() ^ v_set());
         case ConditionCode::LE: return z_set() || (n_set() ^ v_set());
         case ConditionCode::AL: return true;
-        default: std::runtime_error("Invalid Condition Code: " + +code);
+        default: throw std::runtime_error("Invalid Condition Code: " + std::to_string(code));
     }
 
     return false;
@@ -54,6 +79,7 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 
     Utils::log("New CPSR", std::bitset<32>(cpsr));
     Utils::print("Mode Switch: ");
+
     switch(new_mode)
     {
     case ArmMode::User:
@@ -134,18 +160,18 @@ uint32_t& Arm7TDMI::get_mode_spsr(uint32_t mode)
 {
     switch(mode)
     {
-    case ArmMode::User:
-    case ArmMode::System:
-        return cpsr;
-    
-    case ArmMode::Abort: return spsr_abt;
-    case ArmMode::Supervisor: return spsr_svc;
-    case ArmMode::FastInterrupt: return spsr_fiq;
-    case ArmMode::InterruptRequest: return spsr_irq;
-    case ArmMode::Undefined: return spsr_und;
+        case ArmMode::User:
+        case ArmMode::System:
+            return cpsr;
+        
+        case ArmMode::Abort: return spsr_abt;
+        case ArmMode::Supervisor: return spsr_svc;
+        case ArmMode::FastInterrupt: return spsr_fiq;
+        case ArmMode::InterruptRequest: return spsr_irq;
+        case ArmMode::Undefined: return spsr_und;
     }
 
-    assert("Invalid SPSR: " == "");
+    assert(false && "Invalid SPSR");
     return cpsr;
 }
 
@@ -171,30 +197,6 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
     }
 
     is_branched = true;
-}
-
-/* */
-void Arm7TDMI::arm_execute(uint32_t opcode)
-{
-    is_branched = false;
-
-    uint32_t condition_code = Utils::get_bits(opcode, 28, 32);
-    if (check_condition_code(condition_code))
-    {
-        int index = (Utils::get_bits(opcode, 20, 28) << 4) | Utils::get_bits(opcode, 4, 8);
-        (this->*arm_instr_table[index])(opcode);
-    }
-
-    if (!is_branched)
-        pc += 4;
-}
-
-void Arm7TDMI::thumb_execute(uint16_t opcode)
-{
-    is_branched = false;
-    (this->*thumb_instr_table[opcode >> 8])(opcode);
-    if (!is_branched)
-        pc += 2;
 }
 
 /* Instruction Decoding */

@@ -9,14 +9,32 @@
 
 #include "utils.hpp"
 
+enum class AccessType
+{
+    Sequential, 
+    NonSequential
+};
+
+enum class CycleType 
+{
+    Sequential,
+    NonSequential,
+    Internal,
+    Coprocessor
+};  
+
 class Memory 
 {
 public:
     Memory();
 
+    uint8_t read(uint32_t address);
+    
     uint8_t read8(uint32_t address);
     uint16_t read16(uint32_t address);
     uint32_t read32(uint32_t address); 
+
+    void write(uint8_t byte, uint32_t address);
 
     void write8(uint8_t byte, uint32_t address);
     void write16(uint16_t half_word, uint32_t address);
@@ -31,7 +49,7 @@ private:
     std::array<uint8_t, 0x400> palette_data{};
     std::array<uint8_t, 0x18000> vram{};
     
-    std::array<uint8_t, 0x3FF> io_registers{};
+    std::array<uint8_t, 0x400> io_registers{};
     std::array<uint8_t, 0x400> oam_data{};
 
     //  Turns out there are consequences for putting everything on the stack 
@@ -42,13 +60,42 @@ private:
 };
 
 // ------------------------------------------
+// For Testing Memory Below
+// ------------------------------------------
 
 class TestMemory 
 {
 public:
     TestMemory() {}
-    
-    uint8_t read8(uint32_t address) 
+
+    void write(uint8_t byte, uint32_t address) 
+    {
+        memory.insert_or_assign(address, byte);
+    }
+
+    void write8(uint8_t byte, uint32_t address) 
+    {
+        write(byte, address);
+    }
+
+    void write16(uint16_t half_word, uint32_t address)
+    {
+        write(half_word & 0xFF, address);
+        write((half_word >> 8) & 0xFF, address + 1);
+    }
+
+    void write32(uint32_t word, uint32_t address)
+    {
+        std::string str = "Wrote word " + std::to_string(word) + " @ " + std::to_string(address);
+        Utils::print(str);
+        
+        write(word & 0xFF, address);
+        write((word >> 8) & 0xFF, address + 1);
+        write((word >> 16) & 0xFF, address + 2);
+        write((word >> 24) & 0xFF, address + 3);
+    }
+
+    uint8_t read(uint32_t address) 
     { 
         auto it = memory.find(address);
         
@@ -57,40 +104,23 @@ public:
         
         return 0; 
     }
-
-    void write8(uint8_t byte, uint32_t address) 
-    {
-        memory.insert_or_assign(address, byte);
-    }
-
-    void write16(uint16_t half_word, uint32_t address)
-    {
-        write8(half_word & 0xFF, address);
-        write8((half_word >> 8) & 0xFF, address + 1);
-    }
-
-    void write32(uint32_t word, uint32_t address)
-    {
-        std::string str = "Wrote word " + std::to_string(word) + " @ " + std::to_string(address);
-        Utils::print(str);
-        
-        write8(word & 0xFF, address);
-        write8((word >> 8) & 0xFF, address + 1);
-        write8((word >> 16) & 0xFF, address + 2);
-        write8((word >> 24) & 0xFF, address + 3);
+    
+    uint8_t read8(uint32_t address) 
+    { 
+        return read(address);
     }
 
     uint16_t read16(uint32_t address)
     {
-        return read8(address) | (read8(address + 1) << 8);
+        return read(address) | (read(address + 1) << 8);
     }
 
     uint32_t read32(uint32_t address)
     {  
-        return read8(address) | 
-            (read8(address + 1) << 8) | 
-            (read8(address + 2) << 16) | 
-            (read8(address + 3) << 24); 
+        return read(address) | 
+            (read(address + 1) << 8) | 
+            (read(address + 2) << 16) | 
+            (read(address + 3) << 24); 
     }
 
     void clear_memory() { memory.clear(); }

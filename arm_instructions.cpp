@@ -21,7 +21,7 @@ enum AluOps
 };
 
 
-// 2S + 1N Incremental Cycles
+// 2S + 1N Cycles
 void Arm7TDMI::arm_branch(uint32_t opcode)
 {
     Utils::print("ARM Branch & Branch w/ Link \n");
@@ -77,6 +77,10 @@ void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode)
     assert(Utils::is_bit_set(opcode, 4));
 }
 
+// Normal Data Processing: 1S
+// Data Processing w/ reg specified shift: 1S + 1I
+// Data Processing w/ dst == r15: 2S + 1N (Not TEQ, TST, CMP, CMN)
+// Data Processing w/ two of above: 2S + 1N + 1I
 void Arm7TDMI::arm_data_processing(uint32_t opcode)
 {
     Utils::print("ARM Data Processing\n");
@@ -237,6 +241,10 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     }
 }
 
+// LDM: nS + 1N + 1I cycles
+// LDM w/ PC: (n+1)S + 2N + 1I cycles
+// STM: (n-1)S + 2N cycles
+// where n is # of words transferred
 void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 {
     Utils::print("ARM Block Data Transfer\n");
@@ -292,8 +300,6 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
     }
 
     uint32_t address_to_write_to_base = address;
-    bool first_register = true;
-    bool base_is_first = true;
 
     if (is_load)
     {
@@ -328,7 +334,6 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         pc += 4;
         is_branched = true;
 
-
         for (int i = 0; i < 16; ++i)
         {
             int index = (add_offset_to_base) ? i : 15 - i;
@@ -336,11 +341,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
                 continue;
 
             if (index == base_register_index)
-            {
-                base_is_first = first_register;
                 address_to_write_to_base = address + (add_offset_before_transfer ? offset_amount : 0);
-            }
-            first_register = false;
 
             if (add_offset_before_transfer) 
             { 
@@ -369,7 +370,6 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
     stored, will therefore store the unchanged value, whereas with the base second or later 
     in the transfer order, will store the modified value.
     */
-    Utils::log("Base is first", base_is_first);
     Utils::log("Address to write to base", address_to_write_to_base);
 
     if (writeback_to_base) 
@@ -391,24 +391,21 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         }
         else
         {
-            /// @note There's may be an issue with which register list to use
-            /// (Either User registers or the registers from the current mode)
-            /// Could also be caused by the CPSR mode switching at the start
             *registers_to_transfer[base_register_index] = address;
             Utils::log("Final Base Register", *registers_to_transfer[base_register_index]);
-            // I think the transfer order is wrong
-            // I think it goes from 0 to 14 regardles off add_to_offset
-            bool local_base_first = true;
-            for (int i = 0; i <= 16; ++i)
+
+            bool base_is_first = true;
+            for (int i = 0; i < 16; ++i)
             {
                 if (Utils::is_bit_set(register_list, i))
                 {
-                    local_base_first = i == base_register_index;
+                    base_is_first = i == base_register_index;
                     break;
                 }
             }
-            Utils::log("Local Base Is First", local_base_first);
-            if (!local_base_first && Utils::is_bit_set(register_list, base_register_index))
+
+            Utils::log("Local Base Is First", base_is_first);
+            if (!base_is_first && Utils::is_bit_set(register_list, base_register_index))
                 memory.write32(address, address_to_write_to_base);
 
             // Pipeline Flush
@@ -423,66 +420,9 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
     // STM is unbelievably scuffed
 }
 
-/*
-    ARM Block Data Transfer
-    Base Register Index: 15
-    Base Register: 1310087728
-    Register List: 1101011111001101
-    Add Before Transfer: 0
-    Add to Offset: 0
-    Load PSR Or Force USR Mode: 0
-    Writeback to Base: 1
-    Is Load: 0
-    Offset Amount: -4
-    Register 15, Wrote word 1310087732 @ 1310087728
-    Register 14, Wrote word 3927456793 @ 1310087724
-    Register 12, Wrote word 252784362 @ 1310087720
-    Register 10, Wrote word 4045167113 @ 1310087716
-    Register 9, Wrote word 1252012097 @ 1310087712
-    Register 8, Wrote word 3286281369 @ 1310087708
-    Register 7, Wrote word 151937067 @ 1310087704
-    Register 6, Wrote word 583068934 @ 1310087700
-    Register 3, Wrote word 1082351317 @ 1310087696
-    Register 2, Wrote word 1839655083 @ 1310087692
-    Register 0, Wrote word 3664913581 @ 1310087688
-    Base is first: 1
-    Address to write to base: 1310087728
-    Final Base Register: 1310087684
-    word @ 1310087728 Expected: 1310087684 Got: 1310087732
-*/
-/*
-    Similarities: 
-        Base is First
-        Both expect updated value to be written to memory address
-        Load PSR Or Force USR Mode: 0
-
-*/
-/*
-    New CPSR: 01110000000000000000000011010000
-    Mode Switch: USER/SYSTEM
-    Index: 100100101101
-    ARM Block Data Transfer
-    Base Register Index: 14
-    Base Register: 1801935581
-    Register List: 0110100011011000
-    Add Before Transfer: 1
-    Add to Offset: 0
-    Load PSR Or Force USR Mode: 0
-    Writeback to Base: 1
-    Is Load: 0
-    Offset Amount: -4
-    Register 14, Wrote word 1801935581 @ 1801935577
-    Register 13, Wrote word 372889274 @ 1801935573
-    Register 11, Wrote word 1963475339 @ 1801935569
-    Register 7, Wrote word 2819620844 @ 1801935565
-    Register 6, Wrote word 433404757 @ 1801935561
-    Register 4, Wrote word 2001625075 @ 1801935557
-    Register 3, Wrote word 784512997 @ 1801935553
-    Base is first: 1
-    Address to write to base: 1801935577
-    Final Base Register: 1801935553
-    word @ 1801935577 Expected: 1801935553 Got: 1801935581
-*/
+// LDR(H,SH,SB): 1S + 1N + 1I cycles
+// LDR(H, SH, SB) w/ PC: 2S + 2N + 1I cycles
+// STRH: 2N cycles
 void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 {
     Utils::print("ARM Halfword Data Transfer\n");
@@ -664,7 +604,12 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
     }
 }
 
-
+// MUL: 1S + ml cycles
+// MLA: 1S + (m+1)I cycles
+// m = 1 if bits [32:8] of mult operand are all zero or all one
+// m = 2 if bits [32:16] of mult operand are all zero or all one
+// m = 3 if bits [32:24] of mult operand are all zero or all one
+// m = 4 in all other cases
 void Arm7TDMI::arm_multiply(uint32_t opcode)
 {
     Utils::print("ARM Multiply\n");
@@ -715,6 +660,18 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
     }
 }
 
+// MULL: 1S + (m+1)I cycles
+// MLAL: 1S + (m+2)I cycles
+// For SMULL and SMLAL:
+// m = 1 if bits [32:8] of mult operand are all zero or all one
+// m = 2 if bits [32:16] of mult operand are all zero or all one
+// m = 3 if bits [32:24] of mult operand are all zero or all one
+// m = 4 in all other cases
+// For UMULL and UMLAL:
+// m = 1 if bits [32:8] of mult operand are all zero
+// m = 2 if bits [32:16] of mult operand are all zero
+// m = 3 if bits [32:24] of mult operand are all zero
+// m = 4 in all other cases
 void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 {
     Utils::print("ARM Multiply Long\n");
@@ -775,12 +732,12 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     {
         set_cpsr(ProgramStatusRegsiter::N, dst_register_hi & Utils::MSB32);
         set_cpsr(ProgramStatusRegsiter::Z, dst_register_hi == 0 && dst_register_lo == 0);
-        set_cpsr(ProgramStatusRegsiter::C, dst_register_hi < op1_register_mult); // Carry Flag is destroyed anyways
          
         skip_mult_instr = true;
     }
 }
 
+// 1S cycle
 void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 {
     Utils::print("ARM PSR Transfer\n");
@@ -871,7 +828,7 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
     }
 }
 
-// 2S + 1N + 1I
+// 2S + 1N + 1I cycles
 void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 {
     Utils::print("ARM Single Data Swap\n");
@@ -891,8 +848,8 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
     uint32_t& swap_address = *registers[swap_reg_index];
     uint32_t& src_register = arm_get_rm(opcode);
 
-    Utils::log("Destination Index: ", dst_reg_index);
-    Utils::log("Swap Register Index: ", swap_reg_index);
+    Utils::log("Destination Index", dst_reg_index);
+    Utils::log("Swap Register Index", swap_reg_index);
 
     Utils::log("Dest Register Value", dst_register);
     Utils::log("Swap Address Value", swap_address);
@@ -923,6 +880,9 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
     Utils::log("Final Dst Value", dst_register);
 }
 
+// LDR: 1S + 1N + 1I cycles
+// LDR w/ PC: 2S + 2N + 1I cycles
+// STR: 2N cycles
 void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 {
     Utils::print("ARM Single Data Transfer\n");

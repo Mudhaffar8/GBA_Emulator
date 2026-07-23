@@ -29,7 +29,6 @@ public:
     Arm7TDMI(TestMemory& memory);
 
     void tick();
-    void test();
 
 private:
     enum ConditionCode
@@ -119,7 +118,6 @@ private:
 
     bool is_branched = false;
     bool skip_mult_instr = false; // Skipping mult cpsr flag on SST
-    bool skip_instr = false;
 
 private:
     inline uint32_t& get_sp() { return *registers[13]; }
@@ -143,6 +141,7 @@ private:
 
     uint32_t& get_mode_spsr(uint32_t mode);
 
+    /* CPSR Helper Methods */
     bool check_condition_code(uint32_t code);
     constexpr void set_cpsr(ProgramStatusRegsiter bit, bool cond) { cpsr = (cond) ? (cpsr | bit) : (cpsr & ~bit); }
     inline void set_negative_and_zero(uint32_t num) 
@@ -228,11 +227,11 @@ private:
         int dst_reg_index = Utils::get_bits(opcode, 12, 16);
         int src_reg_index = Utils::get_bits(opcode, 16, 20);
 
-        Utils::log("Dst Index", dst_reg_index);
-        Utils::log("Src Index", src_reg_index);
-
         uint32_t& dest_register = *registers[dst_reg_index];
         uint32_t& src_register = *registers[src_reg_index];
+
+        Utils::log("Dst Index", dst_reg_index);
+        Utils::log("Src Index", src_reg_index);
 
         Utils::log("Dst Register", dest_register);
         Utils::log("Srx Register", src_register);
@@ -268,11 +267,11 @@ private:
         int dst_reg_index = Utils::get_bits(opcode, 0, 3);
         int src_reg_index = Utils::get_bits(opcode, 3, 6);
 
-        Utils::log("Dst Index", dst_reg_index);
-        Utils::log("Src Index", src_reg_index);
-
         uint32_t& dest_register = *registers[dst_reg_index];
         uint32_t& src_register = *registers[src_reg_index];
+
+        Utils::log("Dst Index", dst_reg_index);
+        Utils::log("Src Index", src_reg_index);
 
         Utils::log("Dst Register", dest_register);
         Utils::log("Src Register", src_register);

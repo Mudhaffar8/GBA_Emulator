@@ -10,35 +10,44 @@ Memory::Memory() :
     game_pak_rom3(0x2000000, 0)
 {}
 
+void Memory::write8(uint8_t byte, uint32_t address)
+{
+    write(byte, address);
+}
+
 void Memory::write16(uint16_t half_word, uint32_t address)
 {
-    write8(half_word & 0xFF, address);
-    write8(half_word >> 8, address + 1);
+    write(half_word & 0xFF, address);
+    write(half_word >> 8, address + 1);
 }
 
 void Memory::write32(uint32_t word, uint32_t address)
 {
-    write8(word & 0xFF, address);
-    write8((word >> 8) & 0xFF, address + 1);
-    write8((word >> 16) & 0xFF, address + 2);
-    write8((word >> 24) & 0xFF, address + 3);
+    write(word & 0xFF, address);
+    write((word >> 8) & 0xFF, address + 1);
+    write((word >> 16) & 0xFF, address + 2);
+    write((word >> 24) & 0xFF, address + 3);
 }
 
+uint8_t Memory::read8(uint32_t address)
+{
+    return read(address);
+}
 
 uint16_t Memory::read16(uint32_t address)
 {
-    return read8(address) | (read8(address + 1) << 8);
+    return read(address) | (read(address + 1) << 8);
 }
 
 uint32_t Memory::read32(uint32_t address)
 {  
-    return read8(address) | 
-        (read8(address + 1) << 8) | 
-        (read8(address + 2) << 16) | 
-        (read8(address + 3) << 24); 
+    return read(address) | 
+        (read(address + 1) << 8) | 
+        (read(address + 2) << 16) | 
+        (read(address + 3) << 24); 
 }
 
-uint8_t Memory::read8(uint32_t address)
+uint8_t Memory::read(uint32_t address)
 {
     // The memory map is so clean :o
     switch(address & 0xF000000)
@@ -72,7 +81,7 @@ uint8_t Memory::read8(uint32_t address)
     return 0;
 }
 
-void Memory::write8(uint8_t byte, uint32_t address)
+void Memory::write(uint8_t byte, uint32_t address)
 {
     switch(address & 0xF000000)
     {
