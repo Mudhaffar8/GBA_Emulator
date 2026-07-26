@@ -47,9 +47,7 @@ void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
     assert(Utils::get_bits(opcode, 4, 28) == 0b0001'0010'1111'1111'1111'0001);
 
     // If R15 is used as an operand, the behaviour is undefined.
-    uint32_t reg_index = Utils::get_bits(opcode, 0, 4);
-    uint32_t address = *registers[reg_index];
-
+    uint32_t address = arm_get_rm(opcode);
     branch_and_exchange(address);
 }
 
@@ -90,11 +88,11 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     int dst_reg_index = Utils::get_bits(opcode, 12, 16);
     int src_reg_index = Utils::get_bits(opcode, 16, 20);
 
-    Utils::log("Dst Reg Index", dst_reg_index);
-    Utils::log("Op1 Reg Index", src_reg_index);
-
     uint32_t& dst_register = *registers[dst_reg_index];
     uint32_t& op1_register = *registers[src_reg_index];
+
+    Utils::log("Dst Reg Index", dst_reg_index);
+    Utils::log("Op1 Reg Index", src_reg_index);
 
     Utils::log("Dst Register", dst_register);
     Utils::log("Op1 Register", op1_register);
@@ -124,13 +122,15 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
     if (is_immediate)
     {
         uint32_t imm8 = Utils::get_bits(opcode, 0, 8);
-        int shift = Utils::get_bits(opcode, 8, 12);
+        int shift_amount = Utils::get_bits(opcode, 8, 12);
 
         Utils::log("Imm8", imm8);
-        Utils::log("Shift Amount", shift);
+        Utils::log("Shift Amount", shift_amount);
 
         bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
-        op2 = alu_ror(imm8, shift * 2, set_condition_codes, !is_arithmetic);
+        op2 = (shift_amount == 0) ? 
+            imm8 : 
+            alu_ror(imm8, shift_amount * 2, set_condition_codes, !is_arithmetic);
     }
     else 
     {
@@ -449,12 +449,12 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 
     int src_dst_index = Utils::get_bits(opcode, 12, 16);
     int base_index = Utils::get_bits(opcode, 16, 20);
-
-    Utils::log("Src/Dst Index", src_dst_index);
-    Utils::log("Base Index", base_index);
     
     uint32_t& dst_src_register = *registers[src_dst_index];
     uint32_t& base_register = *registers[base_index];
+
+    Utils::log("Src/Dst Index", src_dst_index);
+    Utils::log("Base Index", base_index);
 
     Utils::log("Src/Dst Register", dst_src_register);
     Utils::log("Base Register", base_register);
@@ -1042,9 +1042,9 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     assert(Utils::get_bits(opcode, 24, 28) == 0b1111);
 
     /// @note The bottom 24 bits of the instruction are ignored by the processor
-    handle_state_switch(ArmState::Arm);
-
     spsr_svc = cpsr;
+
+    handle_state_switch(ArmState::Arm);
     handle_mode_switch(ArmMode::Supervisor); 
     set_cpsr(ProgramStatusRegsiter::I, true);
      
@@ -1053,7 +1053,7 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     is_branched = true;
 }
 
-// 2S + 1I + 1N cycles
+// 2S + 1I + 1N cycles (Where does the internal cycle even come from?)
 void Arm7TDMI::arm_undefined(uint32_t opcode)
 {
     Utils::print("ARM Undefined\n");
@@ -1062,9 +1062,9 @@ void Arm7TDMI::arm_undefined(uint32_t opcode)
     assert(Utils::is_bit_set(opcode, 4));
 
     /// @note The bottom 24 bits of the instruction are ignored by the processor
-    handle_state_switch(ArmState::Arm);
-
     spsr_svc = cpsr;
+
+    handle_state_switch(ArmState::Arm);
     handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
      

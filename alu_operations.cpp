@@ -208,20 +208,17 @@ uint32_t Arm7TDMI::alu_ror(uint32_t op1, uint32_t op2, bool set_cc, bool set_car
         V Flag = unaffected
     */
     uint32_t result = op1;
-    if (Utils::get_bits(op2, 0, 5) != 0 || Utils::get_bits(op2, 0, 8) != 0)
+    uint8_t rotate_amount = Utils::get_bits(op2, 0, 5);
+    uint32_t bits_shifted_out = Utils::get_bits(op1, 0, rotate_amount);
+    result >>= rotate_amount;
+    result |= (bits_shifted_out << (32 - rotate_amount)); 
+
+    if (set_cc) 
     {
-        uint8_t rotate_amount = Utils::get_bits(op2, 0, 5);
-        
-        if (set_cc && set_carry)
-            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, rotate_amount - 1));
-
-        uint32_t bits_shifted_out = Utils::get_bits(op1, 0, rotate_amount);
-        result >>= rotate_amount;
-        result |= (bits_shifted_out << (32 - rotate_amount)); 
-    }
-
-    if (set_cc)
         set_negative_and_zero(result);
+        if (set_carry)
+            set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(op1, rotate_amount - 1));
+    }
     
     return result;
 }
@@ -260,6 +257,7 @@ uint32_t Arm7TDMI::alu_mul(uint32_t op1, uint32_t op2, bool set_cc)
     return result;
 }
 
+// Fails ARM Data Processing w/ Register specified shift with -O2 optimizations
 uint32_t Arm7TDMI::decode_shift_operation_arm(uint32_t op1, uint32_t shift_amount, int shift_type, bool set_condition_codes, bool update_carry_flag)
 {
     switch(shift_type)
@@ -341,3 +339,24 @@ uint32_t Arm7TDMI::decode_shift_operation_arm(uint32_t op1, uint32_t shift_amoun
 
     return 0;
 }
+
+/*
+New CPSR: 01100000000000000000000011010001
+Mode Switch: FIQ
+ARM Data Processing
+Dst Reg Index: 0
+Op1 Reg Index: 2
+Dst Register: 1263897206
+Op1 Register: 233209794
+Operation: 9
+Set CC: 1
+Is Immediate: 0
+Shift Type: 3
+Is Register Shift: 1
+Shift Amount: 96
+Shift: 0
+Operand 2: 2255227870
+Dst Register: 1263897206
+CPSR Expected: 10100000000000000000000011010001
+ Got: 10000000000000000000000011010001
+*/

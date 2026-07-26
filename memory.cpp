@@ -5,9 +5,8 @@
 #include "utils.hpp"
 
 Memory::Memory() : 
-    game_pak_rom1(0x2000000, 0),
-    game_pak_rom2(0x2000000, 0),
-    game_pak_rom3(0x2000000, 0)
+    game_pak_rom(0x6000000, 0),
+    game_pak_sram(0x2000000, 0)
 {}
 
 void Memory::write8(uint8_t byte, uint32_t address)
@@ -62,15 +61,15 @@ uint8_t Memory::read(uint32_t address)
     
     case 0x8000000: 
     case 0x9000000: 
-        return game_pak_rom1.at(address - 0x8000000);
+        return game_pak_rom.at(address - 0x8000000);
     
     case 0xA000000: 
     case 0xB000000: 
-        return game_pak_rom2.at(address - 0xA000000);
+        return game_pak_rom.at(address - 0xA000000);
 
     case 0xC000000: 
     case 0xD000000: 
-        return game_pak_rom3.at(address - 0xC000000);
+        return game_pak_rom.at(address - 0xC000000);
     
     case 0xE000000: 
         return game_pak_sram.at(address - 0xE000000);
@@ -95,15 +94,15 @@ void Memory::write(uint8_t byte, uint32_t address)
     
     case 0x8000000: 
     case 0x9000000: 
-        game_pak_rom1.at(address - 0x8000000) = byte;
+        game_pak_rom.at(address - 0x8000000) = byte;
     
     case 0xA000000: 
     case 0xB000000: 
-        game_pak_rom2.at(address - 0xA000000) = byte;
+        game_pak_rom.at(address - 0xA000000) = byte;
 
     case 0xC000000: 
     case 0xD000000: 
-        game_pak_rom3.at(address - 0xC000000) = byte;
+        game_pak_rom.at(address - 0xC000000) = byte;
     
     case 0xE000000: 
         game_pak_sram.at(address - 0xE000000) = byte;

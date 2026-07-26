@@ -226,7 +226,6 @@ public:
             GBATests::run_test(cpu, memory, "arm_swp.json");
         }
 
-        // Passes All THUMB Tests
         if (run_thumb)
         {
             GBATests::run_test(cpu, memory, "thumb_add_sp_or_pc.json"); 

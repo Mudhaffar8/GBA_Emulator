@@ -26,7 +26,7 @@ namespace Arm7VectorAddr
 class Arm7TDMI 
 {
 public:
-    Arm7TDMI(TestMemory& memory);
+    explicit Arm7TDMI(TestMemory& memory);
 
     void tick();
 
@@ -67,6 +67,14 @@ private:
         Arm = 0x00,
         Thumb = 0x20
     };
+
+    enum class CycleType 
+    {
+        Sequential,
+        NonSequential,
+        Internal,
+        Coprocessor
+    };  
 
     enum ProgramStatusRegsiter
     {
@@ -143,7 +151,7 @@ private:
 
     /* CPSR Helper Methods */
     bool check_condition_code(uint32_t code);
-    constexpr void set_cpsr(ProgramStatusRegsiter bit, bool cond) { cpsr = (cond) ? (cpsr | bit) : (cpsr & ~bit); }
+    void set_cpsr(ProgramStatusRegsiter bit, bool cond) { cpsr = (cond) ? (cpsr | bit) : (cpsr & ~bit); }
     inline void set_negative_and_zero(uint32_t num) 
     { 
         set_cpsr(ProgramStatusRegsiter::N, num & Utils::MSB32);

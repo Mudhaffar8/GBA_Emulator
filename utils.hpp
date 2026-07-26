@@ -10,13 +10,13 @@ namespace Utils
     constexpr bool DEBUG_MODE = false;
 
     template <typename T>
-    constexpr void log(std::string_view name, T val)
+    inline void log(std::string_view name, T val)
     {
         if constexpr (DEBUG_MODE) 
             std::cout << name << ": " << val << '\n';
     }
 
-    constexpr void print(std::string_view what)
+    inline void print(std::string_view what)
     {
         if constexpr (DEBUG_MODE) 
             std::cout << what;

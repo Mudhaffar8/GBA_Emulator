@@ -20,7 +20,7 @@ enum Interrupts
     GamePak = (1 << 13),
 };
 
-namespace GBInterrupts
+namespace GBAInterrupts
 {
     inline void request_interrupt(Memory& mem, Interrupts interrupt) {}
     inline void unset_interrupt(Memory& mem, Interrupts interrupt) {}

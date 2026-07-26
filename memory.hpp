@@ -2,11 +2,13 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "memory_regions.hpp"
 #include "utils.hpp"
 
 enum class AccessType
@@ -14,14 +16,6 @@ enum class AccessType
     Sequential, 
     NonSequential
 };
-
-enum class CycleType 
-{
-    Sequential,
-    NonSequential,
-    Internal,
-    Coprocessor
-};  
 
 class Memory 
 {
@@ -40,6 +34,32 @@ public:
     void write16(uint16_t half_word, uint32_t address);
     void write32(uint32_t word, uint32_t address);
 
+    /// @note read_io16, read_io32, write_io16, write_io32 all assume little-endian
+    /// Who's using big-endian in 2026? Are you running this on a NASA computer?
+    uint16_t read_io16(uint32_t address)
+    {
+        uint16_t val{};
+        std::memcpy(&val, &io_registers[address - 0x4000000], sizeof(uint16_t));
+        return val;
+    }
+
+    uint32_t read_io32(uint32_t address)
+    {
+        uint32_t val{};
+        std::memcpy(&val, &io_registers[address - 0x4000000], sizeof(uint32_t));
+        return val;
+    }
+
+    void write_io16(uint16_t half_word, uint32_t address)
+    {
+        std::memcpy(&io_registers[address - 0x4000000], &half_word, sizeof(uint16_t));
+    }
+
+    void write_io32(uint32_t word, uint32_t address)
+    {
+        std::memcpy(&io_registers[address - 0x4000000], &word, sizeof(uint32_t));
+    }
+
 private: 
     std::array<uint8_t, 0x4000> system_rom{}; 
      
@@ -53,9 +73,7 @@ private:
     std::array<uint8_t, 0x400> oam_data{};
 
     //  Turns out there are consequences for putting everything on the stack 
-    std::vector<uint8_t> game_pak_rom1;
-    std::vector<uint8_t> game_pak_rom2;
-    std::vector<uint8_t> game_pak_rom3;
+    std::vector<uint8_t> game_pak_rom;
     std::vector<uint8_t> game_pak_sram;
 };
 
@@ -87,7 +105,7 @@ public:
     void write32(uint32_t word, uint32_t address)
     {
         std::string str = "Wrote word " + std::to_string(word) + " @ " + std::to_string(address);
-        Utils::print(str);
+        // Utils::print(str);
         
         write(word & 0xFF, address);
         write((word >> 8) & 0xFF, address + 1);

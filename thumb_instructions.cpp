@@ -142,7 +142,17 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         dest_register = alu_sbc(dest_register, src_register, true);
         break;
     case 0b0111: // ROR Rd, Rs
-        dest_register = alu_ror(dest_register, src_register, true);
+        {
+            if (Utils::get_bits(src_register, 0, 8) == 0)
+                set_negative_and_zero(dest_register);
+            else if (Utils::get_bits(src_register, 0, 5) == 0)
+            {
+                set_negative_and_zero(dest_register);
+                set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(dest_register, 31));
+            }
+            else  
+                dest_register = alu_ror(dest_register, src_register & 0xFF, true);
+        }
         break;
     case 0b1000: // TST Rd, Rs -> Set Condition codes on Rd AND Rs
         alu_and_tst(dest_register, src_register, true);
@@ -647,6 +657,7 @@ void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
 }
 
 // 2S + 1N cycles
+// This may have some problems idk
 void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 {
     Utils::print("THUMB Software Interrupt\n");
@@ -655,9 +666,9 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 
     /// @note Value8 is used solely by the SWI handler: it is ignored by the processor
     /// @note The bottom 24 bits of the instruction are ignored by the processor
-    handle_state_switch(ArmState::Arm);
-
     spsr_svc = cpsr;
+
+    handle_state_switch(ArmState::Arm);
     handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
@@ -709,9 +720,9 @@ void Arm7TDMI::thumb_undefined(uint16_t opcode)
 {
     Utils::print("THUMB Undefined\n");
 
-    handle_state_switch(ArmState::Arm);
-
     spsr_svc = cpsr;
+
+    handle_state_switch(ArmState::Arm);
     handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
      

@@ -1,10 +1,13 @@
 #pragma once
 
-#include <array>
+#include <cstdint>
+#include <vector>
 
 class Scheduler
 {
 public:
+    Scheduler();
+
     enum class EventType
     {
         VBlank,
@@ -18,5 +21,6 @@ public:
     };  
 
 private:
-    std::array<Event, 12> event_queue{};
+    std::vector<Event> event_queue;
+    uint64_t cycles_elapsed = 0;
 };
