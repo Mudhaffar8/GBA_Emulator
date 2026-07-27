@@ -12,12 +12,16 @@ void Arm7TDMI::tick()
 {
     if (is_thumb_mode())
     {
-        uint16_t half_word = memory.read16(pc - 4);
+        // I'm leaving the access type as none so far
+        // Not every instruction takes a Sequential cycle (i.e. STR)
+        uint16_t half_word = memory.read16(pc - 4, AccessType::None);
         thumb_execute(half_word);
     }
     else
     {
-        uint32_t word = memory.read32(pc - 8);
+        // I'm leaving the access type as none so far
+        // Not every instruction takes a Sequential cycle (i.e. STR)
+        uint32_t word = memory.read32(pc - 8, AccessType::None);
         arm_execute(word);
     }
 }
@@ -186,17 +190,15 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
     uint32_t new_address = Utils::get_bits(address, 1, 32) << 1;
     if (address & 1)
     {
-        pc = new_address + 4;
         handle_state_switch(ArmState::Thumb);
+        reload_pipeline16(new_address + 4);
     }
     else
     {
         // 0b10 is unpredictable behaviour
-        pc = new_address + 8;
         handle_state_switch(ArmState::Arm);
+        reload_pipeline32(new_address + 8);
     }
-
-    is_branched = true;
 }
 
 /* Instruction Decoding */

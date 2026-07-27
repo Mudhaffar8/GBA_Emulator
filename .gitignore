@@ -2,3 +2,4 @@
 *.exe
 **/v1/
 json.hpp
+**/.vscode/

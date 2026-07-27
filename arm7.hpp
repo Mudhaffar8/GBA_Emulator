@@ -30,7 +30,7 @@ public:
 
     void tick();
 
-private:
+private:    
     enum ConditionCode
     {
         EQ = 0b0000, // Equal, Z = 1
@@ -67,14 +67,6 @@ private:
         Arm = 0x00,
         Thumb = 0x20
     };
-
-    enum class CycleType 
-    {
-        Sequential,
-        NonSequential,
-        Internal,
-        Coprocessor
-    };  
 
     enum ProgramStatusRegsiter
     {
@@ -138,6 +130,7 @@ private:
     inline bool mode_has_spsr() { return get_curr_mode() != ArmMode::User && get_curr_mode() != ArmMode::System; }
 
     /* Instruction Table Dispatch */
+    /// @todo Make these into static arrays
     std::array<ArmFunc, 4096> generate_arm_table();
     std::array<ThumbFunc, 256> generate_thumb_table();
 
@@ -299,29 +292,40 @@ private:
     }
 
     /* Stack Operations */
-    inline void thumb_stack_push(uint32_t val)
+    inline void thumb_stack_push(uint32_t val, AccessType access_type)
     {
         get_sp() -= 4;
-        memory.write32(val, get_sp());
+        memory.write32(val, get_sp(), access_type);
     }
 
-    inline uint32_t thumb_stack_pop()
+    inline uint32_t thumb_stack_pop(AccessType access_type)
     {
-        uint32_t popped_value = memory.read32(get_sp());
+        uint32_t popped_value = memory.read32(get_sp(), access_type);
         get_sp() += 4;
         return popped_value;
     }
 
-    /* Setting PC Register */
-    inline void set_pc_word_offset(uint32_t new_addr) 
+    /* Pipeline Refills */
+    /// @note There really isn't a pipeline to load in the first place.
+    /// This exists just for the sake of cycle counting.
+    /// Be sure to account for the offset in the new address.
+    inline void reload_pipeline32(uint32_t new_pc)
     {
-        pc = new_addr + 8;
+        pc = new_pc;
+
+        auto _ = memory.read32(pc - 8, AccessType::NonSequential);
+        _ = memory.read32(pc - 4, AccessType::Sequential);
+
         is_branched = true;
     }
 
-    inline void set_pc_halfword_offset(uint32_t new_addr) 
+    inline void reload_pipeline16(uint32_t new_pc)
     {
-        pc = new_addr + 4;
+        pc = new_pc;
+
+        auto _ = memory.read16(pc - 4, AccessType::NonSequential);
+        _ = memory.read16(pc - 2, AccessType::Sequential);
+       
         is_branched = true;
     }
 

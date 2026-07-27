@@ -35,8 +35,9 @@ void Arm7TDMI::arm_branch(uint32_t opcode)
     
     // The branch offset must take account of the prefetch operation, 
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
-    pc += sign_extended_offset + 8;
-    is_branched = true;
+    reload_pipeline32(pc + sign_extended_offset + 8);
+
+    memory.add_bus_transaction(CycleType::Sequential, pc);
 }
 
 // 2S + 1N Cycles
@@ -58,6 +59,8 @@ void Arm7TDMI::arm_coprocessor_data_operation(uint32_t opcode)
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(!Utils::is_bit_set(opcode, 4));
+
+    arm_undefined(opcode);
 }
 
 void Arm7TDMI::arm_coprocessor_data_transfer(uint32_t opcode) 
@@ -65,6 +68,8 @@ void Arm7TDMI::arm_coprocessor_data_transfer(uint32_t opcode)
     Utils::print("ARM Coprocessor Data Transfer\n");
     
     assert(Utils::get_bits(opcode, 25, 28) == 0b110);
+
+    arm_undefined(opcode);
 }
 
 void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode) 
@@ -73,6 +78,8 @@ void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode)
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(Utils::is_bit_set(opcode, 4));
+
+    arm_undefined(opcode);
 }
 
 // Normal Data Processing: 1S
@@ -292,15 +299,16 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         *registers_to_transfer[base_register_index] += offset_amount * 16;
 
         if (is_load)
-            pc = (memory.read32(*registers_to_transfer[base_register_index]) + 4);
+            pc = (memory.read32(*registers_to_transfer[base_register_index], AccessType::Sequential) + 4);
         else
-            memory.write32(pc + 4, *registers_to_transfer[base_register_index]);
+            memory.write32(pc + 4, *registers_to_transfer[base_register_index], AccessType::NonSequential);
 
         return;
     }
 
     uint32_t address_to_write_to_base = address;
 
+    AccessType access_type = AccessType::NonSequential;
     if (is_load)
     {
         for (int i = 0; i < 16; ++i)
@@ -314,11 +322,11 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                *registers_to_transfer[index] = memory.read32(address);
+                *registers_to_transfer[index] = memory.read32(address, access_type);
             }
             else
             {
-                *registers_to_transfer[index] = memory.read32(address);
+                *registers_to_transfer[index] = memory.read32(address, access_type);
                 address += offset_amount;
             }
 
@@ -327,6 +335,8 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
                 pc += 8;
                 is_branched = true;
             }
+
+            access_type = AccessType::Sequential;
         }  
     }
     else
@@ -346,13 +356,14 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                memory.write32(*registers_to_transfer[index], address);
+                memory.write32(*registers_to_transfer[index], address, access_type);
             }
             else
             {
-                memory.write32(*registers_to_transfer[index], address);
+                memory.write32(*registers_to_transfer[index], address, access_type);
                 address += offset_amount;
             }
+            access_type = AccessType::Sequential;
         }       
     }
 
@@ -406,7 +417,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
             Utils::log("Local Base Is First", base_is_first);
             if (!base_is_first && Utils::is_bit_set(register_list, base_register_index))
-                memory.write32(address, address_to_write_to_base);
+                memory.write32(address, address_to_write_to_base, AccessType::None);
 
             // Pipeline Flush
             if (base_register_index == 15)
@@ -416,6 +427,11 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             }
         }
     }
+
+    if (is_load)
+        memory.add_bus_transaction(CycleType::Sequential, pc);
+    else
+        memory.add_bus_transaction(CycleType::NonSequential, pc);
 
     // STM is unbelievably scuffed
 }
@@ -476,12 +492,12 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                uint16_t val = memory.read16(base_address);
+                uint16_t val = memory.read16(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 1) ? alu_ror(val, 8, false) : val;
             }
             else
             {
-                uint16_t val = memory.read16(base_address);
+                uint16_t val = memory.read16(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 1) ? alu_ror(val, 8, false) : val;
                 base_address += total_offset;
             }
@@ -497,11 +513,11 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                memory.write16(dst_src_register & 0xFFFF, base_address);
+                memory.write16(dst_src_register & 0xFFFF, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write16(dst_src_register & 0xFFFF, base_address);
+                memory.write16(dst_src_register & 0xFFFF, base_address, AccessType::NonSequential);
                 base_address += total_offset;
             }
         }
@@ -513,11 +529,11 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                dst_src_register = Utils::sign_extend32(memory.read8(base_address), 0, 7);
+                dst_src_register = Utils::sign_extend32(memory.read8(base_address, AccessType::NonSequential), 0, 7);
             }
             else
             {
-                dst_src_register = Utils::sign_extend32(memory.read8(base_address), 0, 7);
+                dst_src_register = Utils::sign_extend32(memory.read8(base_address, AccessType::NonSequential), 0, 7);
                 base_address += total_offset;
             }
         }
@@ -532,11 +548,11 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                memory.write8(dst_src_register, base_address);
+                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write8(dst_src_register, base_address);
+                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += total_offset;
             }
         }
@@ -549,14 +565,14 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             { 
                 base_address += total_offset;
                 dst_src_register = (base_address & 1) ? 
-                    Utils::sign_extend32(memory.read8(base_address + 1), 0, 7) : 
-                    Utils::sign_extend32(memory.read16(base_address), 0, 15);
+                    Utils::sign_extend32(memory.read8(base_address + 1, AccessType::NonSequential), 0, 7) : 
+                    Utils::sign_extend32(memory.read16(base_address, AccessType::NonSequential), 0, 15);
             }
             else
             {
                 dst_src_register = (base_address & 1) ? 
-                    Utils::sign_extend32(memory.read8(base_address + 1), 0, 7) : 
-                    Utils::sign_extend32(memory.read16(base_address), 0, 15);
+                    Utils::sign_extend32(memory.read8(base_address + 1, AccessType::NonSequential), 0, 7) : 
+                    Utils::sign_extend32(memory.read16(base_address, AccessType::NonSequential), 0, 15);
                 base_address += total_offset;
             }
         }
@@ -571,11 +587,11 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                memory.write16(dst_src_register, base_address);
+                memory.write16(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write16(dst_src_register, base_address);
+                memory.write16(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += total_offset;
             }
         }
@@ -735,6 +751,8 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
          
         skip_mult_instr = true;
     }
+
+    memory.add_bus_transaction(CycleType::Sequential, pc);
 }
 
 // 1S cycle
@@ -862,14 +880,14 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 
     if (swap_byte)
     {
-        uint8_t swap_address_value = memory.read8(swap_address);    
-        memory.write8(src_register, swap_address);
+        uint8_t swap_address_value = memory.read8(swap_address, AccessType::NonSequential);    
+        memory.write8(src_register, swap_address, AccessType::NonSequential);
         value = swap_address_value;
     }
     else
     {
-        uint32_t swap_address_value = memory.read32(swap_address);
-        memory.write32(src_register, swap_address);
+        uint32_t swap_address_value = memory.read32(swap_address, AccessType::NonSequential);
+        memory.write32(src_register, swap_address, AccessType::NonSequential);
         value = (swap_address & 3) ? alu_ror(swap_address_value, (swap_address & 3) * 8, false) : swap_address_value;
     }
 
@@ -942,11 +960,11 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                dst_src_register = memory.read8(base_address);
+                dst_src_register = memory.read8(base_address, AccessType::NonSequential);
             }
             else
             {
-                dst_src_register = memory.read8(base_address);
+                dst_src_register = memory.read8(base_address, AccessType::NonSequential);
                 base_address += offset_amount;
             }
         }
@@ -963,11 +981,11 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                memory.write8(dst_src_register, base_address);
+                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write8(dst_src_register, base_address);
+                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += offset_amount;
             }
         }
@@ -979,12 +997,12 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                uint32_t val = memory.read32(base_address);
+                uint32_t val = memory.read32(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 3) ? alu_ror(val, (base_address & 3) * 8, false) : val;
             }
             else
             {
-                uint32_t val = memory.read32(base_address);
+                uint32_t val = memory.read32(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 3) ? alu_ror(val, (base_address & 3) * 8, false) : val;
                 base_address += offset_amount;
             }
@@ -1002,11 +1020,11 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                memory.write32(dst_src_register, base_address);
+                memory.write32(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write32(dst_src_register, base_address);
+                memory.write32(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += offset_amount;
             }
         }
@@ -1049,8 +1067,9 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     set_cpsr(ProgramStatusRegsiter::I, true);
      
     get_link() = pc - 4;
-    pc = Arm7VectorAddr::SWI + 8;
-    is_branched = true;
+    reload_pipeline32(Arm7VectorAddr::SWI + 8);
+
+    memory.add_bus_transaction(CycleType::Sequential, pc);
 }
 
 // 2S + 1I + 1N cycles (Where does the internal cycle even come from?)
@@ -1058,8 +1077,8 @@ void Arm7TDMI::arm_undefined(uint32_t opcode)
 {
     Utils::print("ARM Undefined\n");
 
-    assert(Utils::get_bits(opcode, 25, 28) == 0b011);
-    assert(Utils::is_bit_set(opcode, 4));
+    // assert(Utils::get_bits(opcode, 25, 28) == 0b011);
+    // assert(Utils::is_bit_set(opcode, 4));
 
     /// @note The bottom 24 bits of the instruction are ignored by the processor
     spsr_svc = cpsr;
@@ -1067,8 +1086,11 @@ void Arm7TDMI::arm_undefined(uint32_t opcode)
     handle_state_switch(ArmState::Arm);
     handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
-     
+
+    memory.add_bus_transaction(CycleType::Internal);
+
     get_link() = pc - 4;
-    pc = Arm7VectorAddr::UNDEFINED + 8;
-    is_branched = true;
+    reload_pipeline32(Arm7VectorAddr::UNDEFINED + 8);
+
+    memory.add_bus_transaction(CycleType::Sequential, pc);
 }

@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <iostream>
 #include <vector>
+#include <queue>
 
 class Scheduler
 {
@@ -12,15 +14,32 @@ public:
     {
         VBlank,
         HBlank,
+        Timer,
+        DMA
     };
 
     struct Event 
     {
         EventType event_type;
-        int cycles;
+        uint64_t cycles;
+        
+        Event(EventType et, uint64_t c) : event_type(et), cycles(c) {}
+        
+        bool operator>(const Event& e) const { return cycles > e.cycles; }
     };  
 
+    void add_event(EventType event_type, uint64_t event_cycles);
+    void pop_event();
+
+    uint64_t get_next_event_cycles();
+
+    void advance(uint64_t cycles);
+
+    /* Debugging */
+    void print_all();
+
 private:
-    std::vector<Event> event_queue;
-    uint64_t cycles_elapsed = 0;
+    // Sticking to a priority queue for now
+    std::priority_queue<Event, std::vector<Event>, std::greater<Event>> event_queue{}; 
+    uint64_t global_cycles = 0;
 };

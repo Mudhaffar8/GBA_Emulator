@@ -9,30 +9,42 @@
 #include <vector>
 
 #include "memory_regions.hpp"
+#include "scheduler.hpp"
 #include "utils.hpp"
 
 enum class AccessType
 {
     Sequential, 
-    NonSequential
+    NonSequential,
+    None // Doesn't increment global counter
 };
+
+enum class CycleType 
+{
+    Sequential,
+    NonSequential,
+    Internal,
+    Coprocessor
+};  
 
 class Memory 
 {
 public:
-    Memory();
+    Memory(Scheduler& scheduler);
 
     uint8_t read(uint32_t address);
     
-    uint8_t read8(uint32_t address);
-    uint16_t read16(uint32_t address);
-    uint32_t read32(uint32_t address); 
+    uint8_t read8(uint32_t address, AccessType access_type);
+    uint16_t read16(uint32_t address, AccessType access_type);
+    uint32_t read32(uint32_t address, AccessType access_type); 
 
     void write(uint8_t byte, uint32_t address);
 
-    void write8(uint8_t byte, uint32_t address);
-    void write16(uint16_t half_word, uint32_t address);
-    void write32(uint32_t word, uint32_t address);
+    void write8(uint8_t byte, uint32_t address, AccessType access_type);
+    void write16(uint16_t half_word, uint32_t address, AccessType access_type);
+    void write32(uint32_t word, uint32_t address, AccessType access_type);
+
+    void add_bus_transaction(CycleType cyle_type, uint32_t address = 0);
 
     /// @note read_io16, read_io32, write_io16, write_io32 all assume little-endian
     /// Who's using big-endian in 2026? Are you running this on a NASA computer?
@@ -61,6 +73,8 @@ public:
     }
 
 private: 
+    Scheduler& scheduler;
+    
     std::array<uint8_t, 0x4000> system_rom{}; 
      
     std::array<uint8_t, 0x40000> external_ram{};
@@ -91,18 +105,18 @@ public:
         memory.insert_or_assign(address, byte);
     }
 
-    void write8(uint8_t byte, uint32_t address) 
+    void write8(uint8_t byte, uint32_t address, AccessType access_type = AccessType::None) 
     {
         write(byte, address);
     }
 
-    void write16(uint16_t half_word, uint32_t address)
+    void write16(uint16_t half_word, uint32_t address, AccessType access_type = AccessType::None)
     {
         write(half_word & 0xFF, address);
         write((half_word >> 8) & 0xFF, address + 1);
     }
 
-    void write32(uint32_t word, uint32_t address)
+    void write32(uint32_t word, uint32_t address, AccessType access_type = AccessType::None)
     {
         std::string str = "Wrote word " + std::to_string(word) + " @ " + std::to_string(address);
         // Utils::print(str);
@@ -123,23 +137,25 @@ public:
         return 0; 
     }
     
-    uint8_t read8(uint32_t address) 
+    uint8_t read8(uint32_t address, AccessType access_type = AccessType::None) 
     { 
         return read(address);
     }
 
-    uint16_t read16(uint32_t address)
+    uint16_t read16(uint32_t address, AccessType access_type = AccessType::None)
     {
         return read(address) | (read(address + 1) << 8);
     }
 
-    uint32_t read32(uint32_t address)
+    uint32_t read32(uint32_t address, AccessType access_type = AccessType::None)
     {  
         return read(address) | 
             (read(address + 1) << 8) | 
             (read(address + 2) << 16) | 
             (read(address + 3) << 24); 
     }
+
+    void add_bus_transaction(CycleType cyle_type, uint32_t address = 0) {}
 
     void clear_memory() { memory.clear(); }
 

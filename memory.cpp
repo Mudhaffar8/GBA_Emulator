@@ -4,23 +4,30 @@
 
 #include "utils.hpp"
 
-Memory::Memory() : 
+Memory::Memory(Scheduler& _scheduler) : 
+    scheduler(_scheduler),
     game_pak_rom(0x6000000, 0),
     game_pak_sram(0x2000000, 0)
 {}
 
-void Memory::write8(uint8_t byte, uint32_t address)
+void Memory::add_bus_transaction(CycleType cyle_type, uint32_t address)
+{
+    scheduler.advance(1);
+}
+
+
+void Memory::write8(uint8_t byte, uint32_t address, AccessType access_type)
 {
     write(byte, address);
 }
 
-void Memory::write16(uint16_t half_word, uint32_t address)
+void Memory::write16(uint16_t half_word, uint32_t address, AccessType access_type)
 {
     write(half_word & 0xFF, address);
     write(half_word >> 8, address + 1);
 }
 
-void Memory::write32(uint32_t word, uint32_t address)
+void Memory::write32(uint32_t word, uint32_t address, AccessType access_type)
 {
     write(word & 0xFF, address);
     write((word >> 8) & 0xFF, address + 1);
@@ -28,17 +35,17 @@ void Memory::write32(uint32_t word, uint32_t address)
     write((word >> 24) & 0xFF, address + 3);
 }
 
-uint8_t Memory::read8(uint32_t address)
+uint8_t Memory::read8(uint32_t address, AccessType access_type)
 {
     return read(address);
 }
 
-uint16_t Memory::read16(uint32_t address)
+uint16_t Memory::read16(uint32_t address, AccessType access_type)
 {
     return read(address) | (read(address + 1) << 8);
 }
 
-uint32_t Memory::read32(uint32_t address)
+uint32_t Memory::read32(uint32_t address, AccessType access_type)
 {  
     return read(address) | 
         (read(address + 1) << 8) | 
