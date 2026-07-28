@@ -31,8 +31,6 @@ public:
     void tick();
 
 private:    
-    using NextPCFetch = AccessType;
-
     enum ConditionCode
     {
         EQ = 0b0000, // Equal, Z = 1
@@ -88,7 +86,9 @@ private:
     };
  
 private:
-    using ArmFunc = void (Arm7TDMI::*)(uint32_t opcode);
+    using NextPCFetch = AccessType;
+
+    using ArmFunc = NextPCFetch (Arm7TDMI::*)(uint32_t opcode);
     using ThumbFunc = NextPCFetch (Arm7TDMI::*)(uint16_t opcode);
 
     TestMemory& memory;
@@ -182,21 +182,21 @@ private:
     /// @todo Make arm and thumb instructions into static methods
     /// Take CPU reference as an argument
     /* ARM Instructions */
-    void arm_branch(uint32_t opcode); // Branch, Branch and Link
-    void arm_branch_and_exchange(uint32_t opcode);
-    void arm_block_data_transfer(uint32_t opcode);
-    void arm_coprocessor_data_operation(uint32_t opcode);
-    void arm_coprocessor_data_transfer(uint32_t opcode);
-    void arm_coprocessor_register_transfer(uint32_t opcode);
-    void arm_data_processing(uint32_t opcode);
-    void arm_halfword_data_transfer(uint32_t opcode);
-    void arm_multiply(uint32_t opcode);
-    void arm_multiply_long(uint32_t opcode);
-    void arm_psr_transfer(uint32_t opcode);
-    void arm_software_interrupt(uint32_t opcode);
-    void arm_single_data_swap(uint32_t opcode);
-    void arm_single_data_transfer(uint32_t opcode);
-    void arm_undefined(uint32_t opcode);
+    NextPCFetch arm_branch(uint32_t opcode); // Branch, Branch and Link
+    NextPCFetch arm_branch_and_exchange(uint32_t opcode);
+    NextPCFetch arm_block_data_transfer(uint32_t opcode);
+    NextPCFetch arm_coprocessor_data_operation(uint32_t opcode);
+    NextPCFetch arm_coprocessor_data_transfer(uint32_t opcode);
+    NextPCFetch arm_coprocessor_register_transfer(uint32_t opcode);
+    NextPCFetch arm_data_processing(uint32_t opcode);
+    NextPCFetch arm_halfword_data_transfer(uint32_t opcode);
+    NextPCFetch arm_multiply(uint32_t opcode);
+    NextPCFetch arm_multiply_long(uint32_t opcode);
+    NextPCFetch arm_psr_transfer(uint32_t opcode);
+    NextPCFetch arm_software_interrupt(uint32_t opcode);
+    NextPCFetch arm_single_data_swap(uint32_t opcode);
+    NextPCFetch arm_single_data_transfer(uint32_t opcode);
+    NextPCFetch arm_undefined(uint32_t opcode);
 
     /* THUMB Instructions */
     // I gotta find shorter method names
@@ -313,22 +313,62 @@ private:
     /// Be sure to account for the offset in the new address.
     inline void reload_pipeline32(uint32_t new_pc)
     {
+        assert(!is_thumb_mode());
+
         pc = new_pc;
 
-        auto _ = memory.read32(pc - 8, AccessType::NonSequential);
-        _ = memory.read32(pc - 4, AccessType::Sequential);
+        (void)memory.read32(pc - 8, AccessType::NonSequential);
+        (void)memory.read32(pc - 4, AccessType::Sequential);
 
         is_branched = true;
     }
 
     inline void reload_pipeline16(uint32_t new_pc)
     {
+        assert(is_thumb_mode());
+
         pc = new_pc;
 
-        auto _ = memory.read16(pc - 4, AccessType::NonSequential);
-        _ = memory.read16(pc - 2, AccessType::Sequential);
+        (void)memory.read16(pc - 4, AccessType::NonSequential);
+        (void)memory.read16(pc - 2, AccessType::Sequential);
        
         is_branched = true;
+    }
+
+    /* Mult Cycle Counting */
+    enum class MultType { MulMla, UmullUmlal, SmullSmlal };
+
+    template <MultType T>
+    uint32_t get_mult_internal_cycles(uint32_t mult_operand)
+    {
+        uint32_t bits = Utils::get_bits(mult_operand, 8, 31);
+        if (bits == 0) return 1;
+
+        if constexpr(T == MultType::MulMla)
+        {
+            if (bits == 0xFFFFFF) return 1;
+            else if ((bits & 0xFFFF00) == 0 || (bits & 0xFFFF00) == 0xFFFF00) return 2;
+            else if ((bits & 0xFF0000) == 0 || (bits & 0xFF0000) == 0xFF0000) return 3;
+
+            return 4;
+        }
+        if constexpr(T == MultType::UmullUmlal)
+        {
+            if (bits == 0xFFFFFF) return 1;
+            else if ((bits & 0xFFFF00) == 0 || (bits & 0xFFFF00) == 0xFFFF00) return 2;
+            else if ((bits & 0xFF0000) == 0 || (bits & 0xFF0000) == 0xFF0000) return 3;
+            
+            return 4;
+        }
+        if constexpr(T == MultType::SmullSmlal)
+        {
+            if ((bits & 0xFFFF) == 0) return 2;
+            else if ((bits & 0xFF) == 0) return 3;
+
+            return 4;
+        }
+
+        return 1;
     }
 
     friend class GBATests;

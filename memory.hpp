@@ -19,14 +19,6 @@ enum class AccessType
     None // Doesn't increment global counter
 };
 
-enum class CycleType 
-{
-    Sequential,
-    NonSequential,
-    Internal,
-    Coprocessor
-};  
-
 class Memory 
 {
 public:
@@ -45,7 +37,7 @@ public:
     void write16(uint16_t half_word, uint32_t address, AccessType access_type);
     void write32(uint32_t word, uint32_t address, AccessType access_type);
 
-    void add_bus_transaction(CycleType cyle_type, uint32_t address = 0);
+    void add_internal_cycles(uint32_t cycles_to_advance = 1);
 
     /// @note read_io16, read_io32, write_io16, write_io32 all assume little-endian
     /// Who's using big-endian in 2026? Are you running this on a NASA computer?
@@ -171,7 +163,7 @@ public:
             (read(address + 3) << 24); 
     }
 
-    void add_bus_transaction(CycleType cyle_type, uint32_t address = 0) {}
+    void add_internal_cycles(uint32_t cycles_to_advance = 1) { internal_cycles += cycles_to_advance; }
 
     void clear_memory() { memory.clear(); }
 
@@ -189,4 +181,5 @@ public:
 private:
     std::unordered_map<uint32_t, uint8_t> memory{};
     std::unordered_map<uint32_t, std::pair<std::string, AccessType>> accesses{};
+    uint32_t internal_cycles = 0;
 };

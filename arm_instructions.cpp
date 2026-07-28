@@ -22,7 +22,7 @@ enum AluOps
 
 
 // 2S + 1N Cycles
-void Arm7TDMI::arm_branch(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_branch(uint32_t opcode)
 {
     Utils::print("ARM Branch & Branch w/ Link \n");
     assert(Utils::get_bits(opcode, 25, 28) == 0b101);
@@ -37,11 +37,11 @@ void Arm7TDMI::arm_branch(uint32_t opcode)
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
     reload_pipeline32(pc + sign_extended_offset + 8);
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 2S + 1N Cycles
-void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
 {
     Utils::print("ARM Branch And Exchange\n");
 
@@ -49,44 +49,46 @@ void Arm7TDMI::arm_branch_and_exchange(uint32_t opcode)
 
     // If R15 is used as an operand, the behaviour is undefined.
     uint32_t address = arm_get_rm(opcode);
-    branch_and_exchange(address);
+    branch_and_exchange(address); // 1S + 1N
+
+    return NextPCFetch::Sequential;
 }
 
 // Unused as GBA has no coprocessors
-void Arm7TDMI::arm_coprocessor_data_operation(uint32_t opcode) 
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_coprocessor_data_operation(uint32_t opcode) 
 {
     Utils::print("ARM Coprocessor Data Operation\n");
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(!Utils::is_bit_set(opcode, 4));
 
-    arm_undefined(opcode);
+    return arm_undefined(opcode);
 }
 
-void Arm7TDMI::arm_coprocessor_data_transfer(uint32_t opcode) 
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_coprocessor_data_transfer(uint32_t opcode) 
 {
     Utils::print("ARM Coprocessor Data Transfer\n");
     
     assert(Utils::get_bits(opcode, 25, 28) == 0b110);
 
-    arm_undefined(opcode);
+    return arm_undefined(opcode);
 }
 
-void Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode) 
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_coprocessor_register_transfer(uint32_t opcode) 
 {
     Utils::print("ARM Coprocessor Register Transfer\n");
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1110);
     assert(Utils::is_bit_set(opcode, 4));
 
-    arm_undefined(opcode);
+    return arm_undefined(opcode);
 }
 
 // Normal Data Processing: 1S
 // Data Processing w/ reg specified shift: 1S + 1I
 // Data Processing w/ dst == r15: 2S + 1N (Not TEQ, TST, CMP, CMN)
 // Data Processing w/ two of above: 2S + 1N + 1I
-void Arm7TDMI::arm_data_processing(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
 {
     Utils::print("ARM Data Processing\n");
 
@@ -152,6 +154,8 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         uint32_t shift_amount{}; 
         if (is_register_shift) 
         {
+            memory.add_internal_cycles();
+            
             // Only the least significant byte of the contents of Rs is 
             // used to determine the shift amount.
             shift_amount = arm_get_rs(opcode) & 0xFF;
@@ -241,18 +245,17 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
             cpsr = get_mode_spsr(curr_mode);
         }
         if (operation < AluOps::Tst || operation > AluOps::Cmn)
-        {
-            pc += 8;
-            is_branched = true;
-        }
+            reload_pipeline32(pc + 8);
     }
+
+    return NextPCFetch::Sequential;
 }
 
 // LDM: nS + 1N + 1I cycles
 // LDM w/ PC: (n+1)S + 2N + 1I cycles
 // STM: (n-1)S + 2N cycles
 // where n is # of words transferred
-void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 {
     Utils::print("ARM Block Data Transfer\n");
 
@@ -299,11 +302,17 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         *registers_to_transfer[base_register_index] += offset_amount * 16;
 
         if (is_load)
+        {
             pc = (memory.read32(*registers_to_transfer[base_register_index], AccessType::Sequential) + 4);
+
+            return NextPCFetch::Sequential;
+        }
         else
+        {
             memory.write32(pc + 4, *registers_to_transfer[base_register_index], AccessType::NonSequential);
 
-        return;
+            return NextPCFetch::NonSequential;
+        }
     }
 
     uint32_t address_to_write_to_base = address;
@@ -331,10 +340,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             }
 
             if (index == 15)
-            {
-                pc += 8;
-                is_branched = true;
-            }
+                reload_pipeline32(pc + 8);
 
             access_type = AccessType::Sequential;
         }  
@@ -363,6 +369,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
                 memory.write32(*registers_to_transfer[index], address, access_type);
                 address += offset_amount;
             }
+
             access_type = AccessType::Sequential;
         }       
     }
@@ -394,10 +401,7 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
                 
                 // Pipeline Flush
                 if (base_register_index == 15)
-                {
-                    pc += 8;
-                    is_branched = true;
-                }
+                    reload_pipeline32(pc + 8);
             }
         }
         else
@@ -421,25 +425,18 @@ void Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
             // Pipeline Flush
             if (base_register_index == 15)
-            {
-                pc += 8;
-                is_branched = true;
-            }
+                reload_pipeline32(pc + 8);
         }
     }
 
-    if (is_load)
-        memory.add_bus_transaction(CycleType::Sequential, pc);
-    else
-        memory.add_bus_transaction(CycleType::NonSequential, pc);
-
     // STM is unbelievably scuffed
+    return (is_load) ? NextPCFetch::Sequential :NextPCFetch::NonSequential;
 }
 
 // LDR(H,SH,SB): 1S + 1N + 1I cycles
 // LDR(H, SH, SB) w/ PC: 2S + 2N + 1I cycles
 // STRH: 2N cycles
-void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 {
     Utils::print("ARM Halfword Data Transfer\n");
 
@@ -489,6 +486,8 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
     {
         if (is_load)
         {
+            memory.add_internal_cycles();
+
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
@@ -526,6 +525,8 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
     {
         if (is_load)
         {
+            memory.add_internal_cycles();
+
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
@@ -561,6 +562,8 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
     {
         if (is_load)
         {
+            memory.add_internal_cycles();
+
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
@@ -599,10 +602,7 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 
 
     if (src_dst_index == 15 && is_load)
-    {
-        pc += 8;
-        is_branched = true;
-    }
+        reload_pipeline32(pc + 8);
 
     if (writeback_to_base || !add_before_transfer)
     {   
@@ -612,12 +612,11 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
         if (base_index == 15)
         {
             if (src_dst_index != base_index || !is_load)
-            {
-                pc += 12;
-                is_branched = true;
-            }
+                reload_pipeline32(pc + 12);
         }
     }
+
+    return (is_load) ? NextPCFetch::Sequential : NextPCFetch::NonSequential;
 }
 
 // MUL: 1S + ml cycles
@@ -626,7 +625,7 @@ void Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 // m = 2 if bits [32:16] of mult operand are all zero or all one
 // m = 3 if bits [32:24] of mult operand are all zero or all one
 // m = 4 in all other cases
-void Arm7TDMI::arm_multiply(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_multiply(uint32_t opcode)
 {
     Utils::print("ARM Multiply\n");
 
@@ -660,9 +659,11 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
     pc += 4;
     is_branched = true;
 
+    memory.add_internal_cycles(get_mult_internal_cycles<MultType::MulMla>(op2_register_mult) + accumulate);
+
     uint32_t result = (op1_register_mult * op2_register_mult) + (accumulate * op3_register_add);
     if (dst_reg_index == 15)
-        pc = result + 8;
+        reload_pipeline32(result + 8);
     else 
         dst_register = result;
 
@@ -674,6 +675,8 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
         
         skip_mult_instr = true;
     }
+
+    return NextPCFetch::Sequential;
 }
 
 // MULL: 1S + (m+1)I cycles
@@ -688,7 +691,7 @@ void Arm7TDMI::arm_multiply(uint32_t opcode)
 // m = 2 if bits [32:16] of mult operand are all zero
 // m = 3 if bits [32:24] of mult operand are all zero
 // m = 4 in all other cases
-void Arm7TDMI::arm_multiply_long(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_multiply_long(uint32_t opcode)
 {
     Utils::print("ARM Multiply Long\n");
 
@@ -715,6 +718,8 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
 
     if (is_signed)
     {
+        memory.add_internal_cycles(get_mult_internal_cycles<MultType::SmullSmlal>(op2_register_mult) + accumulate);
+
         int32_t op1_signed = static_cast<int32_t>(op1_register_mult);
         int32_t op2_signed = static_cast<int32_t>(op2_register_mult);
 
@@ -727,6 +732,8 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     }
     else
     {
+        memory.add_internal_cycles(get_mult_internal_cycles<MultType::UmullUmlal>(op2_register_mult) + accumulate);
+
         uint64_t op1_unsigned = static_cast<uint64_t>(op1_register_mult);
         uint64_t op2_unsigned = static_cast<uint64_t>(op2_register_mult);
 
@@ -742,7 +749,7 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
     dst_register_hi = result_hi;
 
     if (dst_hi_index == 15 || dst_lo_index == 15)
-        pc += 8;
+        reload_pipeline32(pc + 8);
 
     if (set_condition_codes)
     {
@@ -752,11 +759,11 @@ void Arm7TDMI::arm_multiply_long(uint32_t opcode)
         skip_mult_instr = true;
     }
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 1S cycle
-void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_psr_transfer(uint32_t opcode)
 {
     Utils::print("ARM PSR Transfer\n");
 
@@ -779,13 +786,9 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
         dest_register = psr;
 
         // Strangely no Rd = 15 edge case for these tests
-        return;
     }
-    else 
+    else if (!set_to_spsr || mode_has_spsr())
     {
-        if (set_to_spsr && !mode_has_spsr())
-            return;
-
         bool is_immediate = Utils::is_bit_set(opcode, 25);
         Utils::log("Is Immediate", is_immediate);
 
@@ -844,10 +847,12 @@ void Arm7TDMI::arm_psr_transfer(uint32_t opcode)
             handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
         }
     }
+
+    return NextPCFetch::Sequential;
 }
 
 // 2S + 1N + 1I cycles
-void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 {
     Utils::print("ARM Single Data Swap\n");
 
@@ -881,27 +886,31 @@ void Arm7TDMI::arm_single_data_swap(uint32_t opcode)
     if (swap_byte)
     {
         uint8_t swap_address_value = memory.read8(swap_address, AccessType::NonSequential);    
-        memory.write8(src_register, swap_address, AccessType::NonSequential);
+        memory.write8(src_register, swap_address, AccessType::Sequential);
         value = swap_address_value;
     }
     else
     {
         uint32_t swap_address_value = memory.read32(swap_address, AccessType::NonSequential);
-        memory.write32(src_register, swap_address, AccessType::NonSequential);
+        memory.write32(src_register, swap_address, AccessType::Sequential);
         value = (swap_address & 3) ? alu_ror(swap_address_value, (swap_address & 3) * 8, false) : swap_address_value;
     }
 
+    memory.add_internal_cycles();
+
     dst_register = value;
     if (dst_reg_index == 15)
-        pc += 8;
+        reload_pipeline32(pc + 8);
 
     Utils::log("Final Dst Value", dst_register);
+
+    return NextPCFetch::Sequential;
 }
 
 // LDR: 1S + 1N + 1I cycles
 // LDR w/ PC: 2S + 2N + 1I cycles
 // STR: 2N cycles
-void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 {
     Utils::print("ARM Single Data Transfer\n");
 
@@ -957,6 +966,8 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
     {
         if (is_load)
         {
+            memory.add_internal_cycles();
+
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
@@ -994,6 +1005,8 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
     {
         if (is_load)
         {
+            memory.add_internal_cycles();
+
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
@@ -1031,10 +1044,7 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
     }
 
     if (src_dst_index == 15 && is_load)
-    {
-        pc += 8;
-        is_branched = true;
-    }
+        reload_pipeline32(pc + 8);
 
     if (writeback_to_base || !add_before_transfer)
     {   
@@ -1043,17 +1053,18 @@ void Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 
         if (base_index == 15)
         {
+            // Would this actually lead to 2 pipeline flushes?
             if (src_dst_index != base_index || !is_load)
-            {
-                pc += 12;
-                is_branched = true;
-            }
+                reload_pipeline32(pc + 12);
+
         }
     }
+
+    return NextPCFetch::Sequential;
 }
 
 // 2S + 1N Cycles
-void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_software_interrupt(uint32_t opcode)
 {
     Utils::print("ARM Software Interrupt\n");
 
@@ -1067,13 +1078,13 @@ void Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     set_cpsr(ProgramStatusRegsiter::I, true);
      
     get_link() = pc - 4;
-    reload_pipeline32(Arm7VectorAddr::SWI + 8);
+    reload_pipeline32(Arm7VectorAddr::SWI + 8); // 1S + 1N
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 2S + 1I + 1N cycles (Where does the internal cycle even come from?)
-void Arm7TDMI::arm_undefined(uint32_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::arm_undefined(uint32_t opcode)
 {
     Utils::print("ARM Undefined\n");
 
@@ -1087,10 +1098,10 @@ void Arm7TDMI::arm_undefined(uint32_t opcode)
     handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
 
-    memory.add_bus_transaction(CycleType::Internal);
+    memory.add_internal_cycles();
 
     get_link() = pc - 4;
-    reload_pipeline32(Arm7VectorAddr::UNDEFINED + 8);
+    reload_pipeline32(Arm7VectorAddr::UNDEFINED + 8); // 1S + 1N
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }

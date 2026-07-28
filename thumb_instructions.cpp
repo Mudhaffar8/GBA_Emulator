@@ -172,8 +172,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         dest_register = alu_orr(dest_register, src_register, true);
         break;
     case 0b1101: // MUL Rd, Rs -> Rs * Rd
-        /// @todo Figure out how to do the cycle counting for MULT
-        memory.add_bus_transaction(CycleType::Internal);
+        memory.add_internal_cycles(get_mult_internal_cycles<MultType::MulMla>(src_register));
         dest_register = alu_mul(dest_register, src_register, true);
         break;
     case 0b1110: // BIC Rd, Rs -> Rd AND NOT RS
@@ -273,7 +272,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_address(uint16_t opcode)
 
     bool is_stack_pointer = Utils::is_bit_set(opcode, 11);
 
-    memory.add_bus_transaction(CycleType::Internal);
+    memory.add_internal_cycles();
 
     if (is_stack_pointer)
         dest_register = get_sp() + immediate;
@@ -305,7 +304,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 
     if (is_load)
     {
-        memory.add_bus_transaction(CycleType::Internal);
+        memory.add_internal_cycles();
 
         // LDRH Rd,[odd] -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
         // Why doesn't NBA half-word align the address before loading it?
@@ -342,7 +341,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
     
     if (is_load) 
     {
-        memory.add_bus_transaction(CycleType::Internal);
+        memory.add_internal_cycles();
 
         if (is_byte)
             dst_src_register = memory.read8(final_offset, AccessType::NonSequential);
@@ -393,7 +392,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t o
 
     if (is_sign_extended)
     {
-        memory.add_bus_transaction(CycleType::Internal);
+        memory.add_internal_cycles();
 
         if (h_flag)
         {
@@ -410,7 +409,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t o
     {
         if (h_flag)
         {
-            memory.add_bus_transaction(CycleType::Internal);
+            memory.add_internal_cycles();
 
             uint16_t val = memory.read16(final_offset, AccessType::NonSequential);
             dst_register = (final_offset & 1) ? alu_ror(val, 8, false) : val;
@@ -447,7 +446,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
 
     if (is_load) 
     {
-        memory.add_bus_transaction(CycleType::Internal);
+        memory.add_internal_cycles();
 
         if (is_byte)
             dst_register = memory.read8(final_addr, AccessType::NonSequential);
@@ -542,7 +541,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
 
     assert(operation != 0b11);
 
-    memory.add_bus_transaction(CycleType::Internal);
+    memory.add_internal_cycles();
 
     dest_register = decode_shift_operation(src_register, offset5, operation);
 
@@ -651,7 +650,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
     uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
     uint32_t new_address = (pc + immediate10) & ~3;
 
-    memory.add_bus_transaction(CycleType::Internal);
+    memory.add_internal_cycles();
 
     dest_register = memory.read32(new_address, AccessType::NonSequential);
 
@@ -767,7 +766,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
     
     if (is_load)
     {
-        memory.add_bus_transaction(CycleType::Internal);
+        memory.add_internal_cycles();
         
         // Reads from forcibly aligned address “addr AND (NOT 3)”, and does then rotate the data as “ROR (addr AND 3)*8”
         uint32_t val = memory.read32(new_addr, AccessType::NonSequential);

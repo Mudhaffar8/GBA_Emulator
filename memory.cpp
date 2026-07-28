@@ -10,11 +10,10 @@ Memory::Memory(Scheduler& _scheduler) :
     game_pak_sram(0x2000000, 0)
 {}
 
-void Memory::add_bus_transaction(CycleType cyle_type, uint32_t address)
+void Memory::add_internal_cycles(uint32_t cycles_to_advance)
 {
-    scheduler.advance(1);
+    scheduler.advance(cycles_to_advance);
 }
-
 
 void Memory::write8(uint8_t byte, uint32_t address, AccessType access_type)
 {

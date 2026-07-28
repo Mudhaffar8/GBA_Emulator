@@ -44,10 +44,8 @@ uint32_t Arm7TDMI::alu_and_tst(uint32_t op1, uint32_t op2, bool set_cc)
     uint32_t result = op1 & op2;
 
     if (set_cc)
-    {
         set_negative_and_zero(result);
         // C Flag based on shifter carry out
-    }
 
     return result;
 }

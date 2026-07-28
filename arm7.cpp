@@ -12,15 +12,11 @@ void Arm7TDMI::tick()
 {
     if (is_thumb_mode())
     {
-        // I'm leaving the access type as none so far
-        // Not every instruction takes a Sequential cycle (i.e. STR)
         uint16_t half_word = memory.read16(pc - 4, AccessType::None);
         thumb_execute(half_word);
     }
     else
     {
-        // I'm leaving the access type as none so far
-        // Not every instruction takes a Sequential cycle (i.e. STR)
         uint32_t word = memory.read32(pc - 8, AccessType::None);
         arm_execute(word);
     }
@@ -34,7 +30,9 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
     if (check_condition_code(condition_code))
     {
         int index = (Utils::get_bits(opcode, 20, 28) << 4) | Utils::get_bits(opcode, 4, 8);
-        (this->*arm_instr_table[index])(opcode);
+
+        auto next_pc_fetch = (this->*arm_instr_table[index])(opcode);
+        (void)memory.read32(pc, next_pc_fetch); // Really contemplating modeling the pipeline
     }
 
     if (!is_branched)
