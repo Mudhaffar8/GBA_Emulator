@@ -110,17 +110,17 @@ public:
                 
                 if (ram["size"] == 4) 
                 {
-                    mem.write32(data, addr);
+                    mem.write<uint32_t>(data, addr);
                     Utils::print("^ Initialized!\n");
                 }
                 else if (ram["size"] == 2)
                 {
-                    mem.write16(static_cast<uint16_t>(data), addr);
+                    mem.write<uint16_t>(static_cast<uint16_t>(data), addr);
                     Utils::print("^ Initialized!\n");
                 }
                 else if (ram["size"] == 1)
                 {
-                    mem.write8(static_cast<uint8_t>(data), addr);
+                    mem.write<uint8_t>(static_cast<uint8_t>(data), addr);
                     Utils::print("^ Initialized!\n");
                 }
             }
@@ -186,14 +186,14 @@ public:
                 uint32_t addr = static_cast<uint32_t>(ram["addr"]);
 
                 if (ram["size"] == 4)
-                    check_val(mem.read32(addr), data, std::string("word @ ") + std::to_string(addr));
+                    check_val(mem.read<uint32_t>(addr), data, std::string("word @ ") + std::to_string(addr));
                 else if (ram["size"] == 2)
-                    check_val(mem.read16(addr), static_cast<uint16_t>(data), std::string("half word @ ") + std::to_string(addr));
+                    check_val(mem.read<uint16_t>(addr), static_cast<uint16_t>(data), std::string("half word @ ") + std::to_string(addr));
                 else if (ram["size"] == 1)
-                    check_val(mem.read8(addr), static_cast<uint8_t>(data), std::string("byte @ ") + std::to_string(addr));
+                    check_val(mem.read<uint8_t>(addr), static_cast<uint8_t>(data), std::string("byte @ ") + std::to_string(addr));
             }
 
-            mem.clear_memory();
+            mem.clear();
 
             std::cout << "Passed Test #" << std::dec << number << '\n';
         }
@@ -204,7 +204,7 @@ public:
 
     static void run_all_tests(Arm7TDMI& cpu, TestMemory& memory, bool run_arm = true, bool run_thumb = true)
     {  
-        // Passes All ARM Tests (Coprocessor instructions not included)
+        // Passes All ARM Tests
         if (run_arm)
         {
             GBATests::run_test(cpu, memory, "arm_b_bl.json");

@@ -303,13 +303,13 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
         if (is_load)
         {
-            pc = (memory.read32(*registers_to_transfer[base_register_index], AccessType::Sequential) + 4);
+            pc = (memory.read<uint32_t>(*registers_to_transfer[base_register_index], AccessType::Sequential) + 4);
 
             return NextPCFetch::Sequential;
         }
         else
         {
-            memory.write32(pc + 4, *registers_to_transfer[base_register_index], AccessType::NonSequential);
+            memory.write<uint32_t>(pc + 4, *registers_to_transfer[base_register_index], AccessType::NonSequential);
 
             return NextPCFetch::NonSequential;
         }
@@ -331,11 +331,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                *registers_to_transfer[index] = memory.read32(address, access_type);
+                *registers_to_transfer[index] = memory.read<uint32_t>(address, access_type);
             }
             else
             {
-                *registers_to_transfer[index] = memory.read32(address, access_type);
+                *registers_to_transfer[index] = memory.read<uint32_t>(address, access_type);
                 address += offset_amount;
             }
 
@@ -362,11 +362,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                memory.write32(*registers_to_transfer[index], address, access_type);
+                memory.write<uint32_t>(*registers_to_transfer[index], address, access_type);
             }
             else
             {
-                memory.write32(*registers_to_transfer[index], address, access_type);
+                memory.write<uint32_t>(*registers_to_transfer[index], address, access_type);
                 address += offset_amount;
             }
 
@@ -421,7 +421,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
             Utils::log("Local Base Is First", base_is_first);
             if (!base_is_first && Utils::is_bit_set(register_list, base_register_index))
-                memory.write32(address, address_to_write_to_base, AccessType::None);
+                memory.write<uint32_t>(address, address_to_write_to_base, AccessType::None);
 
             // Pipeline Flush
             if (base_register_index == 15)
@@ -491,12 +491,12 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                uint16_t val = memory.read16(base_address, AccessType::NonSequential);
+                uint16_t val = memory.read<uint16_t>(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 1) ? alu_ror(val, 8, false) : val;
             }
             else
             {
-                uint16_t val = memory.read16(base_address, AccessType::NonSequential);
+                uint16_t val = memory.read<uint16_t>(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 1) ? alu_ror(val, 8, false) : val;
                 base_address += total_offset;
             }
@@ -512,11 +512,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                memory.write16(dst_src_register & 0xFFFF, base_address, AccessType::NonSequential);
+                memory.write<uint16_t>(dst_src_register & 0xFFFF, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write16(dst_src_register & 0xFFFF, base_address, AccessType::NonSequential);
+                memory.write<uint16_t>(dst_src_register & 0xFFFF, base_address, AccessType::NonSequential);
                 base_address += total_offset;
             }
         }
@@ -530,11 +530,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                dst_src_register = Utils::sign_extend32(memory.read8(base_address, AccessType::NonSequential), 0, 7);
+                dst_src_register = Utils::sign_extend32(memory.read<uint8_t>(base_address, AccessType::NonSequential), 0, 7);
             }
             else
             {
-                dst_src_register = Utils::sign_extend32(memory.read8(base_address, AccessType::NonSequential), 0, 7);
+                dst_src_register = Utils::sign_extend32(memory.read<uint8_t>(base_address, AccessType::NonSequential), 0, 7);
                 base_address += total_offset;
             }
         }
@@ -549,11 +549,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint8_t>(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint8_t>(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += total_offset;
             }
         }
@@ -568,14 +568,14 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             { 
                 base_address += total_offset;
                 dst_src_register = (base_address & 1) ? 
-                    Utils::sign_extend32(memory.read8(base_address + 1, AccessType::NonSequential), 0, 7) : 
-                    Utils::sign_extend32(memory.read16(base_address, AccessType::NonSequential), 0, 15);
+                    Utils::sign_extend32(memory.read<uint8_t>(base_address + 1, AccessType::NonSequential), 0, 7) : 
+                    Utils::sign_extend32(memory.read<uint16_t>(base_address, AccessType::NonSequential), 0, 15);
             }
             else
             {
                 dst_src_register = (base_address & 1) ? 
-                    Utils::sign_extend32(memory.read8(base_address + 1, AccessType::NonSequential), 0, 7) : 
-                    Utils::sign_extend32(memory.read16(base_address, AccessType::NonSequential), 0, 15);
+                    Utils::sign_extend32(memory.read<uint8_t>(base_address + 1, AccessType::NonSequential), 0, 7) : 
+                    Utils::sign_extend32(memory.read<uint16_t>(base_address, AccessType::NonSequential), 0, 15);
                 base_address += total_offset;
             }
         }
@@ -590,11 +590,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += total_offset;
-                memory.write16(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint16_t>(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write16(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint16_t>(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += total_offset;
             }
         }
@@ -885,14 +885,14 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 
     if (swap_byte)
     {
-        uint8_t swap_address_value = memory.read8(swap_address, AccessType::NonSequential);    
-        memory.write8(src_register, swap_address, AccessType::Sequential);
+        uint8_t swap_address_value = memory.read<uint8_t>(swap_address, AccessType::NonSequential);    
+        memory.write<uint8_t>(src_register, swap_address, AccessType::Sequential);
         value = swap_address_value;
     }
     else
     {
-        uint32_t swap_address_value = memory.read32(swap_address, AccessType::NonSequential);
-        memory.write32(src_register, swap_address, AccessType::Sequential);
+        uint32_t swap_address_value = memory.read<uint32_t>(swap_address, AccessType::NonSequential);
+        memory.write<uint32_t>(src_register, swap_address, AccessType::Sequential);
         value = (swap_address & 3) ? alu_ror(swap_address_value, (swap_address & 3) * 8, false) : swap_address_value;
     }
 
@@ -971,11 +971,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                dst_src_register = memory.read8(base_address, AccessType::NonSequential);
+                dst_src_register = memory.read<uint8_t>(base_address, AccessType::NonSequential);
             }
             else
             {
-                dst_src_register = memory.read8(base_address, AccessType::NonSequential);
+                dst_src_register = memory.read<uint8_t>(base_address, AccessType::NonSequential);
                 base_address += offset_amount;
             }
         }
@@ -992,11 +992,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint8_t>(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write8(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint8_t>(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += offset_amount;
             }
         }
@@ -1010,12 +1010,12 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                uint32_t val = memory.read32(base_address, AccessType::NonSequential);
+                uint32_t val = memory.read<uint32_t>(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 3) ? alu_ror(val, (base_address & 3) * 8, false) : val;
             }
             else
             {
-                uint32_t val = memory.read32(base_address, AccessType::NonSequential);
+                uint32_t val = memory.read<uint32_t>(base_address, AccessType::NonSequential);
                 dst_src_register = (base_address & 3) ? alu_ror(val, (base_address & 3) * 8, false) : val;
                 base_address += offset_amount;
             }
@@ -1033,11 +1033,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             if (add_before_transfer) 
             { 
                 base_address += offset_amount;
-                memory.write32(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint32_t>(dst_src_register, base_address, AccessType::NonSequential);
             }
             else
             {
-                memory.write32(dst_src_register, base_address, AccessType::NonSequential);
+                memory.write<uint32_t>(dst_src_register, base_address, AccessType::NonSequential);
                 base_address += offset_amount;
             }
         }

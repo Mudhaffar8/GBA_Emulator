@@ -9,6 +9,7 @@
 #include <string>
 
 #include "memory.hpp"
+#include "io_register.hpp"
 #include "utils.hpp"
 
 namespace Arm7VectorAddr
@@ -26,7 +27,8 @@ namespace Arm7VectorAddr
 class Arm7TDMI 
 {
 public:
-    explicit Arm7TDMI(TestMemory& memory);
+    /// @todo Add a simple way to switch (at compile-time) between Memory and TestMemory.
+    explicit Arm7TDMI(Memory& memory);
 
     void tick();
 
@@ -91,8 +93,13 @@ private:
     using ArmFunc = NextPCFetch (Arm7TDMI::*)(uint32_t opcode);
     using ThumbFunc = NextPCFetch (Arm7TDMI::*)(uint16_t opcode);
 
-    TestMemory& memory;
+    Memory& memory;
 
+    Io16<GBAIO::IE> interrupt_enable;
+    Io16<GBAIO::IF> interrupt_flag;
+    Io16<GBAIO::IME> ime;
+
+    /// @todo Make these static
     std::array<ArmFunc, 4096> arm_instr_table = generate_arm_table();
     std::array<ThumbFunc, 256> thumb_instr_table = generate_thumb_table();
 
@@ -130,6 +137,8 @@ private:
 
     inline bool is_privileged_mode() { return get_curr_mode() != ArmMode::User; }
     inline bool mode_has_spsr() { return get_curr_mode() != ArmMode::User && get_curr_mode() != ArmMode::System; }
+
+    inline bool is_irq_enabled() { return !(cpsr & ProgramStatusRegsiter::I); }
 
     /* Instruction Table Dispatch */
     /// @todo Make these into static arrays
@@ -178,6 +187,9 @@ private:
 
     /* Branching */
     void branch_and_exchange(uint32_t address);
+
+    /* Interrupt Handling */
+    void handle_irq();
 
     /// @todo Make arm and thumb instructions into static methods
     /// Take CPU reference as an argument
@@ -297,12 +309,12 @@ private:
     inline void thumb_stack_push(uint32_t val, AccessType access_type)
     {
         get_sp() -= 4;
-        memory.write32(val, get_sp(), access_type);
+        memory.write<uint32_t>(val, get_sp(), access_type);
     }
 
     inline uint32_t thumb_stack_pop(AccessType access_type)
     {
-        uint32_t popped_value = memory.read32(get_sp(), access_type);
+        uint32_t popped_value = memory.read<uint32_t>(get_sp(), access_type);
         get_sp() += 4;
         return popped_value;
     }
@@ -317,8 +329,8 @@ private:
 
         pc = new_pc;
 
-        (void)memory.read32(pc - 8, AccessType::NonSequential);
-        (void)memory.read32(pc - 4, AccessType::Sequential);
+        (void)memory.read<uint32_t>(pc - 8, AccessType::NonSequential);
+        (void)memory.read<uint32_t>(pc - 4, AccessType::Sequential);
 
         is_branched = true;
     }
@@ -329,8 +341,8 @@ private:
 
         pc = new_pc;
 
-        (void)memory.read16(pc - 4, AccessType::NonSequential);
-        (void)memory.read16(pc - 2, AccessType::Sequential);
+        (void)memory.read<uint16_t>(pc - 4, AccessType::NonSequential);
+        (void)memory.read<uint16_t>(pc - 2, AccessType::Sequential);
        
         is_branched = true;
     }

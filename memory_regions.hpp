@@ -10,7 +10,7 @@ namespace GBAMem
     constexpr uint32_t EWRAM_END = 0x203FFFF;
 
     constexpr uint32_t IWRAM_START = 0x3000000;
-    constexpr uint32_t IWRAM_END = 0x3007FFF ;
+    constexpr uint32_t IWRAM_END = 0x3007FFF;
 
     constexpr uint32_t IO_REGISTERS_START = 0x4000000;
     constexpr uint32_t IO_REGISTERS_END = 0x40003FE;
@@ -30,7 +30,7 @@ namespace GBAMem
 
 namespace GBAIO
 {
-    // LCD Registers
+    /* LCD Registers */
     constexpr uint32_t DISPCNT = 0x4000000; // LCD Control (R/W)
     constexpr uint32_t DISPSTAT = 0x4000004; // LCD Status (R/W)
     constexpr uint32_t VCOUNT = 0x4000006; // Vertical Counter (R)
@@ -69,7 +69,7 @@ namespace GBAIO
     constexpr uint32_t BLDALPHA = 0x4000052; // Alpha Blending Coefficients
     constexpr uint32_t BLDY = 0x4000054; // Brightness (Fade-In/Out) Coefficient
 
-    // DMA Transfer Channels
+    /* DMA Transfer Channels */
     constexpr uint32_t DMA0SAD = 0x40000B0; // DMA 0 Source Address (32-bit)
     constexpr uint32_t DMA0DAD = 0x40000B4; // DMA 0 Destination Address (32-bit)
     constexpr uint32_t DMA0CNT_L = 0x40000B8; // DMA 0 Word Count 
@@ -87,7 +87,7 @@ namespace GBAIO
     constexpr uint32_t DMA3CNT_L = 0x40000DC; // DMA 3 Word Count 
     constexpr uint32_t DMA3CNT_H = 0x40000DE; // DMA 3 Control 
 
-    // Timer Registers
+    /* Timer Registers */
     constexpr uint32_t TM0CNT_L = 0x4000100; // Timer 0 Counter/Reload
     constexpr uint32_t TM0CNT_H = 0x4000102; // Timer 0 Control
     constexpr uint32_t TM1CNT_L = 0x4000104; // Timer 1 Counter/Reload
@@ -97,11 +97,11 @@ namespace GBAIO
     constexpr uint32_t TM3CNT_L = 0x400010C; // Timer 3 Counter/Reload
     constexpr uint32_t TM3CNT_H = 0x400010E; // Timer 3 Control
 
-    // Keypad Input
+    /* Keypad Input */
     constexpr uint32_t KEYINPUT = 0x400010E; // Key Status (R)
     constexpr uint32_t KEYCNT = 0x4000110; // Key Interrupt Control (R/W)
 
-    // Interrupt, Waitstate, and Power-Down Control
+    /* Interrupt, Waitstate, and Power-Down Control */
     constexpr uint32_t IE = 0x4000200; // Interrupt Enable (R/W)
     constexpr uint32_t IF = 0x4000202; // Interrupt Request Flag / IRQ Acknowledge (R/W)
     constexpr uint32_t WAITCNT = 0x4000204;

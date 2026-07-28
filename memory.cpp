@@ -6,113 +6,80 @@
 
 Memory::Memory(Scheduler& _scheduler) : 
     scheduler(_scheduler),
-    game_pak_rom(0x6000000, 0),
+    game_pak_rom(0x2000000, 0), // 32MB
     game_pak_sram(0x2000000, 0)
 {}
 
-void Memory::add_internal_cycles(uint32_t cycles_to_advance)
+static const std::array<std::vector<int>, 6> WAITSTATE_CTRL_TABLE 
+{{
+    {4, 3, 2, 8}, {2, 1},
+    {4, 3, 2, 8}, {4, 1},
+    {4, 3, 2, 8}, {8, 1},
+}};
+
+void Memory::add_internal_cycles(uint64_t cycles_to_advance)
 {
     scheduler.advance(cycles_to_advance);
 }
 
-void Memory::write8(uint8_t byte, uint32_t address, AccessType access_type)
+void Memory::get_cycles(uint32_t address, AccessType access_type)
 {
-    write(byte, address);
-}
+    uint64_t cycles{};
 
-void Memory::write16(uint16_t half_word, uint32_t address, AccessType access_type)
-{
-    write(half_word & 0xFF, address);
-    write(half_word >> 8, address + 1);
-}
-
-void Memory::write32(uint32_t word, uint32_t address, AccessType access_type)
-{
-    write(word & 0xFF, address);
-    write((word >> 8) & 0xFF, address + 1);
-    write((word >> 16) & 0xFF, address + 2);
-    write((word >> 24) & 0xFF, address + 3);
-}
-
-uint8_t Memory::read8(uint32_t address, AccessType access_type)
-{
-    return read(address);
-}
-
-uint16_t Memory::read16(uint32_t address, AccessType access_type)
-{
-    return read(address) | (read(address + 1) << 8);
-}
-
-uint32_t Memory::read32(uint32_t address, AccessType access_type)
-{  
-    return read(address) | 
-        (read(address + 1) << 8) | 
-        (read(address + 2) << 16) | 
-        (read(address + 3) << 24); 
-}
-
-uint8_t Memory::read(uint32_t address)
-{
-    // The memory map is so clean :o
     switch(address & 0xF000000)
     {
-    case 0x0000000: return system_rom.at(address);
-    case 0x2000000: return external_ram.at(address - 0x2000000);
-    case 0x3000000: return internal_ram.at(address - 0x3000000);
-    case 0x4000000: return io_registers.at(address - 0x4000000);
-    case 0x5000000: return palette_data.at(address - 0x5000000);
-    case 0x6000000: return vram.at(address - 0x6000000);
-    case 0x7000000: return oam_data.at(address - 0x7000000);
+    case 0x0000000: cycles = 1; break; // BIOS
+    case 0x2000000: cycles = 1; break; // IWRAM, 32-bit data bus
+    case 0x3000000: cycles = 3; break; // EWRAM, 16-bit data bus
+    case 0x4000000: cycles = 1; break; // IO Registers
+    case 0x5000000: cycles = 1; break; // Palette 
+    case 0x6000000: cycles = 1; break; // VRAM, 16-bit data bus
+    case 0x7000000: cycles = 1; break; // OAM, unless PPU is accessing at same time then 1
     
+    /// @note The GBA forcefully uses non-sequential timing at the beginning of each 128K-block of gamepak ROM, 
+    /// eg. “LDMIA [801fff8h],r0-r7” will have non-sequential timing at 8020000h.
     case 0x8000000: 
-    case 0x9000000: 
-        return game_pak_rom.at(address - 0x8000000);
-    
+    case 0x9000000:     
+        {
+            bool is_sequential = access_type == AccessType::Sequential;
+            int index = is_sequential ?
+                Utils::is_bit_set(read_io16(GBAIO::WAITCNT), 4) :
+                Utils::get_bits(read_io16(GBAIO::WAITCNT), 2, 4);
+
+            cycles = WAITSTATE_CTRL_TABLE[is_sequential][index];
+        }
+        break;
+        
     case 0xA000000: 
-    case 0xB000000: 
-        return game_pak_rom.at(address - 0xA000000);
+    case 0xB000000: // Game Pak ROM, 16-bit data bus
+        {
+            bool is_sequential = access_type == AccessType::Sequential;
+            int index = is_sequential ?
+                Utils::is_bit_set(read_io16(GBAIO::WAITCNT), 7) :
+                Utils::get_bits(read_io16(GBAIO::WAITCNT), 5, 7);
+
+            cycles = WAITSTATE_CTRL_TABLE[is_sequential + 2][index];
+        }
+        break;
 
     case 0xC000000: 
-    case 0xD000000: 
-        return game_pak_rom.at(address - 0xC000000);
+    case 0xD000000: // Game Pak ROM, 16-bit data bus
+        {
+            bool is_sequential = access_type == AccessType::Sequential;
+            int index = is_sequential ?
+                Utils::is_bit_set(read_io16(GBAIO::WAITCNT), 10) :
+                Utils::get_bits(read_io16(GBAIO::WAITCNT), 8, 10);
+
+            cycles = WAITSTATE_CTRL_TABLE[is_sequential + 4][index];
+        }
+        break;
     
-    case 0xE000000: 
-        return game_pak_sram.at(address - 0xE000000);
-    
+    case 0xE000000: // 8-bit data bus
+        cycles = WAITSTATE_CTRL_TABLE[0][Utils::get_bits(read_io16(GBAIO::WAITCNT), 0, 2)];
+        break;
+
     default: throw std::runtime_error("Invalid Read Address: " + std::to_string(address));
     }
 
-    return 0;
-}
-
-void Memory::write(uint8_t byte, uint32_t address)
-{
-    switch(address & 0xF000000)
-    {
-    case 0x0000000: system_rom.at(address) = byte;
-    case 0x2000000: external_ram.at(address - 0x2000000) = byte;
-    case 0x3000000: internal_ram.at(address - 0x3000000) = byte;
-    case 0x4000000: io_registers.at(address - 0x4000000) = byte;
-    case 0x5000000: palette_data.at(address - 0x5000000) = byte;
-    case 0x6000000: vram.at(address - 0x6000000) = byte;
-    case 0x7000000: oam_data.at(address - 0x7000000) = byte;
-    
-    case 0x8000000: 
-    case 0x9000000: 
-        game_pak_rom.at(address - 0x8000000) = byte;
-    
-    case 0xA000000: 
-    case 0xB000000: 
-        game_pak_rom.at(address - 0xA000000) = byte;
-
-    case 0xC000000: 
-    case 0xD000000: 
-        game_pak_rom.at(address - 0xC000000) = byte;
-    
-    case 0xE000000: 
-        game_pak_sram.at(address - 0xE000000) = byte;
-    
-    default: throw std::runtime_error("Invalid Write Address: " + std::to_string(address));
-    }
+    scheduler.advance(cycles);
 }

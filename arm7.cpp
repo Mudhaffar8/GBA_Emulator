@@ -4,20 +4,30 @@
 #include <iostream>
 #include <stdexcept>
 
-Arm7TDMI::Arm7TDMI(TestMemory& _memory) : 
-    memory(_memory)
-{}
+Arm7TDMI::Arm7TDMI(Memory& _memory) : 
+    memory(_memory),
+    interrupt_enable(_memory),
+    interrupt_flag(_memory),
+    ime(_memory)
+{
+    // In normal GBAs, the FIQ signal is shortcut to VDD35, ie. the signal is always high, 
+    // and there is no way to generate a FIQ by hardware.
+    cpsr |= ProgramStatusRegsiter::F | ArmMode::User;
+}
 
 void Arm7TDMI::tick()
 {
+    if (is_irq_enabled() && (interrupt_enable & interrupt_flag & 0x3FFF) != 0 && (ime & 1))
+        handle_irq();
+    
     if (is_thumb_mode())
     {
-        uint16_t half_word = memory.read16(pc - 4, AccessType::None);
+        uint16_t half_word = memory.read<uint16_t>(pc - 4, AccessType::None);
         thumb_execute(half_word);
     }
     else
     {
-        uint32_t word = memory.read32(pc - 8, AccessType::None);
+        uint32_t word = memory.read<uint32_t>(pc - 8, AccessType::None);
         arm_execute(word);
     }
 }
@@ -32,7 +42,7 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
         int index = (Utils::get_bits(opcode, 20, 28) << 4) | Utils::get_bits(opcode, 4, 8);
 
         auto next_pc_fetch = (this->*arm_instr_table[index])(opcode);
-        (void)memory.read32(pc, next_pc_fetch); // Really contemplating modeling the pipeline
+        (void)memory.read<uint32_t>(pc, next_pc_fetch); // Really contemplating modeling the pipeline
     }
 
     if (!is_branched)
@@ -44,7 +54,7 @@ void Arm7TDMI::thumb_execute(uint16_t opcode)
     is_branched = false;
 
     auto next_pc_fetch = (this->*thumb_instr_table[opcode >> 8])(opcode);
-    (void)memory.read16(pc, next_pc_fetch); // At this point I might as well model the pipeline
+    (void)memory.read<uint16_t>(pc, next_pc_fetch); // At this point I might as well model the pipeline
 
     if (!is_branched)
         pc += 2;
@@ -199,6 +209,21 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
         handle_state_switch(ArmState::Arm);
         reload_pipeline32(new_address + 8);
     }
+}
+
+/// @note This might be 1S cycle off.
+void Arm7TDMI::handle_irq()
+{
+    Utils::print("IRQ\n");
+
+    spsr_irq = cpsr;
+
+    handle_state_switch(ArmState::Arm);
+    handle_mode_switch(ArmMode::InterruptRequest);
+    set_cpsr(ProgramStatusRegsiter::I, true);
+     
+    r14_fiq = pc - (is_thumb_mode() ? 2 : 4);
+    reload_pipeline32(Arm7VectorAddr::IRQ + 8);
 }
 
 /* Instruction Decoding */

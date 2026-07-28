@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -24,21 +25,17 @@ class Memory
 public:
     Memory(Scheduler& scheduler);
 
-    /// @note It would probably be easier/faster to change read and write into template methods.
-    uint8_t read(uint32_t address);
-    
-    uint8_t read8(uint32_t address, AccessType access_type);
-    uint16_t read16(uint32_t address, AccessType access_type);
-    uint32_t read32(uint32_t address, AccessType access_type); 
+    template <typename T>
+    T read(uint32_t address, AccessType access_type);
 
-    void write(uint8_t byte, uint32_t address);
+    template <typename T>
+    void write(T value, uint32_t address, AccessType access_type);
 
-    void write8(uint8_t byte, uint32_t address, AccessType access_type);
-    void write16(uint16_t half_word, uint32_t address, AccessType access_type);
-    void write32(uint32_t word, uint32_t address, AccessType access_type);
+    /* Cycle Counting */
+    void get_cycles(uint32_t address, AccessType access_type);
+    void add_internal_cycles(uint64_t cycles_to_advance = 1);
 
-    void add_internal_cycles(uint32_t cycles_to_advance = 1);
-
+    /* Read/Write Operations for I/O Registers */
     /// @note read_io16, read_io32, write_io16, write_io32 all assume little-endian
     /// Who's using big-endian in 2026? Are you running this on a NASA computer?
     uint16_t read_io16(uint32_t address)
@@ -84,6 +81,80 @@ private:
     std::vector<uint8_t> game_pak_sram;
 };
 
+template <typename T>
+T Memory::read(uint32_t address, AccessType access_type)
+{
+    static_assert(std::is_same<T, uint32_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, uint8_t>::value);
+
+    get_cycles(address, access_type);
+
+    T val{};
+
+    // The memory map is so clean :o
+    switch(address & 0xF000000)
+    {
+    case 0x0000000: std::memcpy(&val, system_rom.data(), sizeof(T)); break;
+    case 0x2000000: std::memcpy(&val, external_ram.data() + (address - 0x2000000), sizeof(T)); break;
+    case 0x3000000: std::memcpy(&val, internal_ram.data() + (address - 0x3000000), sizeof(T)); break;
+    case 0x4000000: std::memcpy(&val, io_registers.data() + (address - 0x4000000), sizeof(T)); break;
+    case 0x5000000: std::memcpy(&val, palette_data.data() + (address - 0x5000000), sizeof(T)); break;
+    case 0x6000000: std::memcpy(&val, vram.data() + (address - 0x6000000), sizeof(T)); break;
+    case 0x7000000: std::memcpy(&val, oam_data.data() + (address - 0x7000000), sizeof(T)); break;
+    
+    case 0x8000000: 
+    case 0x9000000:     
+    case 0xA000000: 
+    case 0xB000000: 
+    case 0xC000000: 
+    case 0xD000000: 
+        std::memcpy(&val, game_pak_rom.data() + ((address - 0x8000000) & 0x1FFFFFF), sizeof(T));
+        break;
+    
+    case 0xE000000: 
+        std::memcpy(&val, game_pak_sram.data() + (address - 0xE000000), sizeof(T));
+        break;
+    
+    default: throw std::runtime_error("Invalid Read Address: " + std::to_string(address));
+    }
+
+    return val;
+}
+
+template <typename T>
+void Memory::write(T val, uint32_t address, AccessType access_type)
+{
+    static_assert(std::is_same<T, uint32_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, uint8_t>::value);
+
+    get_cycles(address, access_type);
+
+    switch(address & 0xF000000)
+    {
+    case 0x0000000: std::memcpy(system_rom.data(), &val, sizeof(T)); break;
+    case 0x2000000: std::memcpy(external_ram.data() + (address - 0x2000000), &val, sizeof(T)); break;
+    case 0x3000000: std::memcpy(internal_ram.data() + (address - 0x3000000), &val, sizeof(T)); break;
+    case 0x4000000: std::memcpy(io_registers.data() + (address - 0x4000000), &val, sizeof(T)); break;
+    case 0x5000000: std::memcpy(palette_data.data() + (address - 0x5000000), &val, sizeof(T)); break;
+    case 0x6000000: std::memcpy(vram.data() + (address - 0x6000000), &val, sizeof(T)); break;
+    case 0x7000000: std::memcpy(oam_data.data() + (address - 0x7000000), &val, sizeof(T)); break;
+    
+    case 0x8000000: 
+    case 0x9000000:     
+    case 0xA000000: 
+    case 0xB000000: 
+    case 0xC000000: 
+    case 0xD000000: 
+        std::memcpy(game_pak_rom.data() + ((address - 0x8000000) & 0x1FFFFFF), &val, sizeof(T));
+        break;
+    
+    case 0xE000000: 
+        std::memcpy(game_pak_sram.data() + (address - 0xE000000), &val, sizeof(T));
+        break;
+    
+    default: throw std::runtime_error("Invalid Write Address: " + std::to_string(address));
+    }
+}
+
+
 // ------------------------------------------
 // For Testing Memory Below
 // ------------------------------------------
@@ -93,40 +164,30 @@ class TestMemory
 public:
     TestMemory() {}
 
-    void write(uint8_t byte, uint32_t address) 
+    void inner_write(uint8_t byte, uint32_t address) 
     {
         memory.insert_or_assign(address, byte);
     }
 
-    void write8(uint8_t byte, uint32_t address, AccessType access_type = AccessType::None) 
+    template<typename T>
+    void write(T val, uint32_t address, AccessType access_type = AccessType::None) 
     {
         if (access_type != AccessType::None)
             accesses.insert_or_assign(address, std::make_pair("write8", access_type));
         
-        write(byte, address);
+        inner_write(val, address);
+
+        if constexpr(std::is_same<T, uint32_t>::value || std::is_same<T, uint16_t>::value) 
+            inner_write((val >> 8) & 0xFF, address + 1);
+
+        if constexpr(std::is_same<T, uint32_t>::value)
+        {
+            inner_write((val >> 16) & 0xFF, address + 2);
+            inner_write((val >> 24) & 0xFF, address + 3);
+        }
     }
 
-    void write16(uint16_t half_word, uint32_t address, AccessType access_type = AccessType::None)
-    {
-        if (access_type != AccessType::None)
-            accesses.insert_or_assign(address, std::make_pair("write16", access_type));
-
-        write(half_word & 0xFF, address);
-        write((half_word >> 8) & 0xFF, address + 1);
-    }
-
-    void write32(uint32_t word, uint32_t address, AccessType access_type = AccessType::None)
-    {
-        if (access_type != AccessType::None)
-            accesses.insert_or_assign(address, std::make_pair("write32", access_type));
-        
-        write(word & 0xFF, address);
-        write((word >> 8) & 0xFF, address + 1);
-        write((word >> 16) & 0xFF, address + 2);
-        write((word >> 24) & 0xFF, address + 3);
-    }
-
-    uint8_t read(uint32_t address) 
+    uint8_t inner_read(uint32_t address) 
     { 
         auto it = memory.find(address);
         
@@ -136,36 +197,34 @@ public:
         return 0; 
     }
     
-    uint8_t read8(uint32_t address, AccessType access_type = AccessType::None) 
+    template<typename T>
+    T read(uint32_t address, AccessType access_type = AccessType::None) 
     { 
         if (access_type != AccessType::None)
             accesses.insert_or_assign(address, std::make_pair("read8", access_type));
 
-        return read(address);
-    }
+        T val = inner_read(address);
 
-    uint16_t read16(uint32_t address, AccessType access_type = AccessType::None)
-    {
-        if (access_type != AccessType::None)
-            accesses.insert_or_assign(address, std::make_pair("read16", access_type));
+        if constexpr(std::is_same<T, uint16_t>::value || std::is_same<T, uint32_t>::value) 
+            val |= inner_read(address + 1) << 8;
 
-        return read(address) | (read(address + 1) << 8);
-    }
+        if constexpr(std::is_same<T, uint32_t>::value)
+        {
+            val |= inner_read(address + 2) << 16;
+            val |= inner_read(address + 3) << 24; 
+        }
 
-    uint32_t read32(uint32_t address, AccessType access_type = AccessType::None)
-    {  
-        if (access_type != AccessType::None)
-            accesses.insert_or_assign(address, std::make_pair("read32", access_type));
-
-        return read(address) | 
-            (read(address + 1) << 8) | 
-            (read(address + 2) << 16) | 
-            (read(address + 3) << 24); 
+        return val;
     }
 
     void add_internal_cycles(uint32_t cycles_to_advance = 1) { internal_cycles += cycles_to_advance; }
 
-    void clear_memory() { memory.clear(); }
+    void clear() 
+    { 
+        memory.clear(); 
+        accesses.clear();
+        internal_cycles = 0;
+    }
 
     void print_memory()
     {
