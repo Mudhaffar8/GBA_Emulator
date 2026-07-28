@@ -5,7 +5,7 @@
 
 // 1S cycles
 // Equivalent to ADD SP, imm8
-void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
 {
     Utils::print("THUMB Add Offset SP\n");
 
@@ -24,12 +24,12 @@ void Arm7TDMI::thumb_add_offset_sp(uint16_t opcode)
         get_sp() - immediate9 : 
         get_sp() + immediate9;
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 1S cycle
 // Equivalent to ADD Rd, Rs, Rn or SUB RD, Rs, Rn
-void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_add_subtract(uint16_t opcode)
 {    
     Utils::print("THUMB Add Subtract\n");
 
@@ -47,12 +47,12 @@ void Arm7TDMI::thumb_add_subtract(uint16_t opcode)
         alu_sub_cmp(src_register, operand2, true) : 
         alu_add_cmn(src_register, operand2, true);
     
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // MUL: 1S + ml (my assumption)
 // Anything else: 1S
-void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_alu_operations(uint16_t opcode)
 {
     Utils::print("THUMB ALU Operations\n");
 
@@ -75,8 +75,6 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         {
             uint32_t first_8_bits = Utils::get_bits(src_register, 0, 8);
             Utils::log("First 8 bits", first_8_bits);
-
-            bool msb_is_set = Utils::is_bit_set(dest_register, 31);
 
             if (first_8_bits < 32)
                 dest_register = alu_lsl(dest_register, first_8_bits, true);
@@ -159,16 +157,16 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         }
         break;
     case 0b1000: // TST Rd, Rs -> Set Condition codes on Rd AND Rs
-        alu_and_tst(dest_register, src_register, true);
+        (void)alu_and_tst(dest_register, src_register, true);
         break;
     case 0b1001: // NEG Rd, Rs
         dest_register = alu_sub_cmp(0, src_register, true);
         break;
     case 0b1010: // CMP Rd, Rs -> Set condition codes on Rd - Rs
-        alu_sub_cmp(dest_register, src_register, true);
+        (void)alu_sub_cmp(dest_register, src_register, true);
         break;
     case 0b1011: // CMN Rd, Rs -> Set condition codes on Rd + Rs
-        alu_add_cmn(dest_register, src_register, true);
+        (void)alu_add_cmn(dest_register, src_register, true);
         break;
     case 0b1100: // ORR Rd, Rs
         dest_register = alu_orr(dest_register, src_register, true);
@@ -189,11 +187,11 @@ void Arm7TDMI::thumb_alu_operations(uint16_t opcode)
         break;
     }
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 2S + 1N cycles
-void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
 {
     Utils::print("THUMB Conditional Branch\n");
 
@@ -205,12 +203,12 @@ void Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
     if (check_condition_code(cond))
         reload_pipeline16(pc + signed_offset9 + 4); 
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // BX: 2S + 1N cycles
 // Anything else: 1S
-void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
 {
     Utils::print("THUMB HI Reg Operations/Branch Exchange\n");
 
@@ -245,7 +243,7 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
         dest_register = alu_add_cmn(dest_register, src_register, false);
         break;
     case 1: // CMP Rd, Rs
-        alu_sub_cmp(dest_register, src_register, true);
+        (void)alu_sub_cmp(dest_register, src_register, true);
         break;
     case 2: // MOV Rd, Rs
         dest_register = alu_mov(src_register, false);
@@ -258,11 +256,11 @@ void Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
         break;
     }
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 1S + 1N + 1I cycles
-void Arm7TDMI::thumb_load_address(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_address(uint16_t opcode)
 {
     Utils::print("THUMB Load Address\n");
 
@@ -287,12 +285,12 @@ void Arm7TDMI::thumb_load_address(uint16_t opcode)
         dest_register = (pc & ~3) + immediate;
     }
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // LDR: 1S + 1N + 1I
 // STR: 2N
-void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 { 
     Utils::print("THUMB Load Store Halfword\n");
 
@@ -314,19 +312,18 @@ void Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
         uint16_t val = memory.read16(total_offset, AccessType::NonSequential);
         dst_src_register = (total_offset & 1) ? alu_ror(val, 8, false) : val;
 
-        memory.add_bus_transaction(CycleType::Sequential, pc);
+        return NextPCFetch::Sequential;
     }
     else 
     {
         memory.write16(dst_src_register & 0xFFFF, total_offset, AccessType::NonSequential);
-
-        memory.add_bus_transaction(CycleType::NonSequential, pc);
+        return NextPCFetch::NonSequential;
     }
 }
 
 // LDR: 1S + 1N + 1I cycles
 // STR: 2N cycles
-void Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
 {
     Utils::print("THUMB Load Store Immediate\n");
 
@@ -340,49 +337,37 @@ void Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
     bool is_byte = Utils::is_bit_set(opcode, 12);
 
     uint32_t final_offset = base_register;
-    if (is_byte) 
+
+    final_offset += (is_byte) ? offset5 : (offset5 << 2);
+    
+    if (is_load) 
     {
-        final_offset += offset5;
-        if (is_load)
-        {
-            memory.add_bus_transaction(CycleType::Internal);
+        memory.add_bus_transaction(CycleType::Internal);
 
+        if (is_byte)
             dst_src_register = memory.read8(final_offset, AccessType::NonSequential);
-
-            memory.add_bus_transaction(CycleType::Sequential, pc);
-        }
         else 
         {
-            memory.write8(dst_src_register, final_offset, AccessType::NonSequential);
-
-            memory.add_bus_transaction(CycleType::NonSequential, pc);
+            uint32_t val = memory.read32(final_offset, AccessType::NonSequential);
+            dst_src_register = (final_offset & 3) ? alu_ror(val, (final_offset & 3) * 8, false) : val;
         }
+
+        return NextPCFetch::Sequential;
     }   
     else 
     {
-        offset5 <<= 2;     
-        final_offset += offset5;
-        if (is_load)
-        {
-            memory.add_bus_transaction(CycleType::Internal);
-
-            uint32_t val = memory.read32(final_offset, AccessType::NonSequential);
-            dst_src_register = (final_offset & 3) ? alu_ror(val, (final_offset & 3) * 8, false) : val;
-            
-            memory.add_bus_transaction(CycleType::Sequential, pc);
-        }
+        if (is_byte)
+            memory.write8(dst_src_register, final_offset, AccessType::NonSequential);
         else 
-        {
             memory.write32(dst_src_register, final_offset, AccessType::NonSequential);
 
-            memory.add_bus_transaction(CycleType::NonSequential, pc);
-        }
+        return NextPCFetch::NonSequential;
     }
 }
 
 // LDRSH: 1S + 1N + 1I cycles
 // STRSH: 2N cycles
-void Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t opcode)
 {
     Utils::print("THUMB Load Store Sign-Extended Halfword/Byte\n");
 
@@ -409,20 +394,17 @@ void Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t opcode)
     if (is_sign_extended)
     {
         memory.add_bus_transaction(CycleType::Internal);
+
         if (h_flag)
         {
             dst_register = (final_offset & 1) ? 
                 Utils::sign_extend32(memory.read8(final_offset + 1, AccessType::NonSequential), 0, 7) : 
                 Utils::sign_extend32(memory.read16(final_offset, AccessType::NonSequential), 0, 15);
-            
-            memory.add_bus_transaction(CycleType::Sequential, pc);
         } 
         else
-        {
             dst_register = Utils::sign_extend32(memory.read8(final_offset, AccessType::NonSequential), 0, 7);
-            
-            memory.add_bus_transaction(CycleType::Sequential, pc);
-        }
+
+        return NextPCFetch::Sequential;
     }
     else 
     {
@@ -433,20 +415,20 @@ void Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t opcode)
             uint16_t val = memory.read16(final_offset, AccessType::NonSequential);
             dst_register = (final_offset & 1) ? alu_ror(val, 8, false) : val;
 
-            memory.add_bus_transaction(CycleType::Sequential, pc);
+            return NextPCFetch::Sequential;
         }
         else
         {
             memory.write16(dst_register, final_offset, AccessType::NonSequential);
 
-            memory.add_bus_transaction(CycleType::NonSequential, pc);
+            return NextPCFetch::NonSequential;
         }
     }
 }
 
 // LDR: 1N + 1S + 1I
 // STR: 2N cycles
-void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
 {
     Utils::print("THUMB Load Store w/ Register Offset\n");
 
@@ -458,47 +440,39 @@ void Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
     int offset_reg_index = Utils::get_bits(opcode, 6, 9);
     uint32_t offset_register = *registers[offset_reg_index];
 
-    uint32_t word8 = Utils::get_bits(opcode, 0, 8);
-
     bool is_byte = Utils::is_bit_set(opcode, 10);
     bool is_load = Utils::is_bit_set(opcode, 11);
 
     uint32_t final_addr = base_register + offset_register;
 
-    if (is_byte) 
+    if (is_load) 
     {
-        if (is_load)
-        {
-            memory.add_bus_transaction(CycleType::Internal);
+        memory.add_bus_transaction(CycleType::Internal);
+
+        if (is_byte)
             dst_register = memory.read8(final_addr, AccessType::NonSequential);
-            memory.add_bus_transaction(CycleType::Sequential, pc);
-        }
         else 
         {
-            memory.write8(dst_register, final_addr, AccessType::NonSequential);
-            memory.add_bus_transaction(CycleType::NonSequential, pc);
-        }
-    }   
-    else 
-    {
-        if (is_load)
-        {
-            memory.add_bus_transaction(CycleType::Internal);
             uint32_t val = memory.read32(final_addr, AccessType::NonSequential);
             // Reads from forcibly aligned address “addr AND (NOT 3)”, and does then rotate the data as “ROR (addr AND 3)*8”
             dst_register = (final_addr & 3) ? alu_ror(val, (final_addr & 3) * 8, false) : val;
-            memory.add_bus_transaction(CycleType::Sequential, pc);
         }
+
+        return NextPCFetch::Sequential;
+    }   
+    else 
+    {
+        if (is_byte)
+            memory.write8(dst_register, final_addr, AccessType::NonSequential);
         else 
-        {
             memory.write32(dst_register, final_addr, AccessType::NonSequential);
-            memory.add_bus_transaction(CycleType::NonSequential, pc);
-        }
+
+        return NextPCFetch::NonSequential;
     }
 }
 
 // This instruction format does not have an equivalent ARM instruction
-void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 {
     Utils::print("THUMB Long Branch w/ Link\n");
 
@@ -512,21 +486,18 @@ void Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
     {
         uint32_t next_instr_addr = pc - 2;
         uint32_t new_addr = (get_link() + (offset << 1) + 4) & ~1;
-        reload_pipeline16(new_addr);
-        get_link() = next_instr_addr | 1;
 
-        memory.add_bus_transaction(CycleType::Sequential, pc);
+        get_link() = next_instr_addr | 1;
+        reload_pipeline16(new_addr);
     }
     else
-    {
         get_link() = pc + (Utils::sign_extend32(offset, 0, 10) << 12);
 
-        memory.add_bus_transaction(CycleType::Sequential, pc);
-    }
+    return NextPCFetch::Sequential;
 }
 
 // 1S cycles
-void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
 {
     Utils::print("THUMB MOV/CMP/ADD/SUB Immediate\n");
 
@@ -543,7 +514,7 @@ void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
             dest_register = alu_mov(offset, true);
             break;
         case 1: // CMP Rd, #Offset8
-            alu_sub_cmp(dest_register, offset, true);
+            (void)alu_sub_cmp(dest_register, offset, true);
             break;
         case 2: // ADD Rd, #Offset8
             dest_register = alu_add_cmn(dest_register, offset, true);
@@ -553,12 +524,12 @@ void Arm7TDMI::thumb_move_cmp_add_sub_immediate(uint16_t opcode)
             break;
     }
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 1S + 1I cycles (my assumption)
 // Equivalent to MOVS RD, RS, SHIFT #Offset5
-void Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
 {
     Utils::print("THUMB Move Shifted Register\n");
 
@@ -575,12 +546,12 @@ void Arm7TDMI::thumb_move_shifted_register(uint16_t opcode)
 
     dest_register = decode_shift_operation(src_register, offset5, operation);
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // LDM: nS + 1N + 1I cycles
 // STM: (n-1)S + 2N cycles
-void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 {
     Utils::print("THUMB Multiple Load Store\n");
 
@@ -608,12 +579,7 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
 
         base_register += 64;
 
-        if (is_load)
-            memory.add_bus_transaction(CycleType::Sequential, pc);
-        else
-            memory.add_bus_transaction(CycleType::NonSequential, pc);
-
-        return;
+        return (is_load) ? NextPCFetch::Sequential : NextPCFetch::NonSequential;
     }
 
     /*
@@ -665,15 +631,12 @@ void Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
         base_register = address; 
 
     // STMIA is scuffed af
-    if (is_load)
-        memory.add_bus_transaction(CycleType::Sequential, pc);
-    else
-        memory.add_bus_transaction(CycleType::NonSequential, pc);
+    return (is_load) ? NextPCFetch::Sequential : NextPCFetch::NonSequential;
 }
 
 // 1S + 1I cycles (my assumption)
 // Equivalent to LDR Rd, [PC, #imm]
-void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
 {
     Utils::print("THUMB PC Relative Load\n");
 
@@ -692,12 +655,12 @@ void Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
 
     dest_register = memory.read32(new_address, AccessType::NonSequential);
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // LDMIA: nS + 1N + 1I cycles
 // STMDB: (n-1)S + 2N cycles
-void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
 {
     Utils::print("THUMB PUSH/POP Registers\n");
 
@@ -718,17 +681,15 @@ void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
             reload_pipeline16(new_addr + 4);
             get_sp() += 60;
 
-            memory.add_bus_transaction(CycleType::Sequential, pc);
+            return NextPCFetch::Sequential;
         }
         else
         {
             get_sp() -= 60;
             thumb_stack_push(pc + 2, AccessType::NonSequential);
 
-            memory.add_bus_transaction(CycleType::NonSequential, pc);
+            return NextPCFetch::NonSequential;
         }
-        
-        return;
     }
     
     AccessType access_type = AccessType::NonSequential;
@@ -762,18 +723,14 @@ void Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
     {
         uint32_t new_addr = (thumb_stack_pop(access_type) & ~1);
         reload_pipeline16(new_addr + 4);
-        get_sp() += 60;
     }
 
-    if (is_pop)
-        memory.add_bus_transaction(CycleType::Sequential, pc);
-    else
-        memory.add_bus_transaction(CycleType::NonSequential, pc);
+    return (is_pop) ? NextPCFetch::Sequential : NextPCFetch::NonSequential;
 }
 
 // 2S + 1N cycles
 // This may have some problems idk
-void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
 {
     Utils::print("THUMB Software Interrupt\n");
 
@@ -790,12 +747,12 @@ void Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
     get_link() = pc - 2;
     reload_pipeline32(Arm7VectorAddr::SWI + 8);
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // LDR: 1S + 1N + 1I cycles
 // STR: 2N cycles
-void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
 {
     Utils::print("THUMB SP Relative Load/Store\n");
 
@@ -810,22 +767,24 @@ void Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
     
     if (is_load)
     {
+        memory.add_bus_transaction(CycleType::Internal);
+        
         // Reads from forcibly aligned address “addr AND (NOT 3)”, and does then rotate the data as “ROR (addr AND 3)*8”
         uint32_t val = memory.read32(new_addr, AccessType::NonSequential);
         dest_register = (new_addr & 3) ? alu_ror(val, (new_addr & 3) * 8, false) : val;
         
-        memory.add_bus_transaction(CycleType::Sequential, pc);
+        return NextPCFetch::Sequential;
     }
     else 
     {
         memory.write32(dest_register, new_addr, AccessType::NonSequential);
-        
-        memory.add_bus_transaction(CycleType::NonSequential, pc);
+
+        return NextPCFetch::NonSequential;
     }
 }
 
 // 2S + 1N cycles
-void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
 {
     Utils::print("THUMB Unconditional Branch\n");
 
@@ -834,11 +793,11 @@ void Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
     int32_t signed_extend12 = Utils::sign_extend32(opcode, 0, 10) << 1;
     reload_pipeline16(pc + signed_extend12 + 4);
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }
 
 // 2S + 1I + 1N cycles (my assumption)
-void Arm7TDMI::thumb_undefined(uint16_t opcode)
+Arm7TDMI::NextPCFetch Arm7TDMI::thumb_undefined(uint16_t opcode)
 {
     Utils::print("THUMB Undefined\n");
 
@@ -851,5 +810,5 @@ void Arm7TDMI::thumb_undefined(uint16_t opcode)
     get_link() = pc - 2;
     reload_pipeline32(Arm7VectorAddr::UNDEFINED + 8);
 
-    memory.add_bus_transaction(CycleType::Sequential, pc);
+    return NextPCFetch::Sequential;
 }

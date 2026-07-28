@@ -31,6 +31,8 @@ public:
     void tick();
 
 private:    
+    using NextPCFetch = AccessType;
+
     enum ConditionCode
     {
         EQ = 0b0000, // Equal, Z = 1
@@ -87,7 +89,7 @@ private:
  
 private:
     using ArmFunc = void (Arm7TDMI::*)(uint32_t opcode);
-    using ThumbFunc = void (Arm7TDMI::*)(uint16_t opcode);
+    using ThumbFunc = NextPCFetch (Arm7TDMI::*)(uint16_t opcode);
 
     TestMemory& memory;
 
@@ -198,26 +200,26 @@ private:
 
     /* THUMB Instructions */
     // I gotta find shorter method names
-    void thumb_add_subtract(uint16_t opcode);
-    void thumb_add_offset_sp(uint16_t opcode);
-    void thumb_alu_operations(uint16_t opcode);
-    void thumb_conditional_branch(uint16_t opcode);
-    void thumb_hi_reg_op_branch_exchange(uint16_t opcode);
-    void thumb_load_address(uint16_t opcode);
-    void thumb_load_store_halfword(uint16_t opcode);
-    void thumb_load_store_immediate(uint16_t opcode);
-    void thumb_load_store_sign_extend_halfword(uint16_t opcode);
-    void thumb_load_store_w_reg_offset(uint16_t opcode);
-    void thumb_long_branch_w_link(uint16_t opcode);
-    void thumb_move_cmp_add_sub_immediate(uint16_t opcode);
-    void thumb_move_shifted_register(uint16_t opcode);
-    void thumb_multiple_load_store(uint16_t opcode);
-    void thumb_pc_relative_load(uint16_t opcode);
-    void thumb_push_pop_registers(uint16_t opcode);
-    void thumb_software_interrupt(uint16_t opcode);
-    void thumb_sp_relative_load_store(uint16_t opcode);
-    void thumb_unconditional_branch(uint16_t opcode);
-    void thumb_undefined(uint16_t opcode);
+    NextPCFetch thumb_add_subtract(uint16_t opcode);
+    NextPCFetch thumb_add_offset_sp(uint16_t opcode);
+    NextPCFetch thumb_alu_operations(uint16_t opcode);
+    NextPCFetch thumb_conditional_branch(uint16_t opcode);
+    NextPCFetch thumb_hi_reg_op_branch_exchange(uint16_t opcode);
+    NextPCFetch thumb_load_address(uint16_t opcode);
+    NextPCFetch thumb_load_store_halfword(uint16_t opcode);
+    NextPCFetch thumb_load_store_immediate(uint16_t opcode);
+    NextPCFetch thumb_load_store_sign_extend_halfword(uint16_t opcode);
+    NextPCFetch thumb_load_store_w_reg_offset(uint16_t opcode);
+    NextPCFetch thumb_long_branch_w_link(uint16_t opcode);
+    NextPCFetch thumb_move_cmp_add_sub_immediate(uint16_t opcode);
+    NextPCFetch thumb_move_shifted_register(uint16_t opcode);
+    NextPCFetch thumb_multiple_load_store(uint16_t opcode);
+    NextPCFetch thumb_pc_relative_load(uint16_t opcode);
+    NextPCFetch thumb_push_pop_registers(uint16_t opcode);
+    NextPCFetch thumb_software_interrupt(uint16_t opcode);
+    NextPCFetch thumb_sp_relative_load_store(uint16_t opcode);
+    NextPCFetch thumb_unconditional_branch(uint16_t opcode);
+    NextPCFetch thumb_undefined(uint16_t opcode);
 
     /* ARM Helper Methods */
     // Bits 12-15 for Dst, Bits 16-19 for Src

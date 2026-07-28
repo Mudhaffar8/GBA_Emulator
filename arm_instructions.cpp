@@ -203,16 +203,16 @@ void Arm7TDMI::arm_data_processing(uint32_t opcode)
         dst_register = alu_sbc(op2, op1_register, set_condition_codes);
         break;
     case AluOps::Tst: // TST
-        alu_and_tst(op1_register, op2, true);
+        (void)alu_and_tst(op1_register, op2, true);
         break;
     case AluOps::Teq: // TEQ
-        alu_eor_teq(op1_register, op2, true);
+        (void)alu_eor_teq(op1_register, op2, true);
         break;
     case AluOps::Cmp: // CMP
-        alu_sub_cmp(op1_register, op2, true);
+        (void)alu_sub_cmp(op1_register, op2, true);
         break;
     case AluOps::Cmn: // CMN
-        alu_add_cmn(op1_register, op2, true);
+        (void)alu_add_cmn(op1_register, op2, true);
         break;
     case AluOps::Orr: // ORR
         dst_register = alu_orr(op1_register, op2, set_condition_codes);

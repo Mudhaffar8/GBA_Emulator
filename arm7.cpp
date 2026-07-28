@@ -44,7 +44,9 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
 void Arm7TDMI::thumb_execute(uint16_t opcode)
 {
     is_branched = false;
-    (this->*thumb_instr_table[opcode >> 8])(opcode);
+
+    auto next_pc_fetch = (this->*thumb_instr_table[opcode >> 8])(opcode);
+    (void)memory.read16(pc, next_pc_fetch); // At this point I might as well model the pipeline
 
     if (!is_branched)
         pc += 2;

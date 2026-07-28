@@ -10,17 +10,10 @@
 
 int main(int argc, char** argv)
 {
-    Scheduler scheduler;
-    scheduler.add_event(Scheduler::EventType::HBlank, 60);
-    scheduler.add_event(Scheduler::EventType::VBlank, 200);
-    scheduler.add_event(Scheduler::EventType::DMA, 40);
-    scheduler.add_event(Scheduler::EventType::Timer, 100);
-
-    scheduler.print_all();
-
     TestMemory test_memory;
     Arm7TDMI cpu(test_memory);
 
-    GBATests::run_test(cpu, test_memory, "thumb_bcc.json");
+    GBATests::run_all_tests(cpu, test_memory, false, true);
+
     return 0;
 }

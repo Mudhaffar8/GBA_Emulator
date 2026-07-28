@@ -32,6 +32,7 @@ class Memory
 public:
     Memory(Scheduler& scheduler);
 
+    /// @note It would probably be easier/faster to change read and write into template methods.
     uint8_t read(uint32_t address);
     
     uint8_t read8(uint32_t address, AccessType access_type);
@@ -107,19 +108,25 @@ public:
 
     void write8(uint8_t byte, uint32_t address, AccessType access_type = AccessType::None) 
     {
+        if (access_type != AccessType::None)
+            accesses.insert_or_assign(address, std::make_pair("write8", access_type));
+        
         write(byte, address);
     }
 
     void write16(uint16_t half_word, uint32_t address, AccessType access_type = AccessType::None)
     {
+        if (access_type != AccessType::None)
+            accesses.insert_or_assign(address, std::make_pair("write16", access_type));
+
         write(half_word & 0xFF, address);
         write((half_word >> 8) & 0xFF, address + 1);
     }
 
     void write32(uint32_t word, uint32_t address, AccessType access_type = AccessType::None)
     {
-        std::string str = "Wrote word " + std::to_string(word) + " @ " + std::to_string(address);
-        // Utils::print(str);
+        if (access_type != AccessType::None)
+            accesses.insert_or_assign(address, std::make_pair("write32", access_type));
         
         write(word & 0xFF, address);
         write((word >> 8) & 0xFF, address + 1);
@@ -139,16 +146,25 @@ public:
     
     uint8_t read8(uint32_t address, AccessType access_type = AccessType::None) 
     { 
+        if (access_type != AccessType::None)
+            accesses.insert_or_assign(address, std::make_pair("read8", access_type));
+
         return read(address);
     }
 
     uint16_t read16(uint32_t address, AccessType access_type = AccessType::None)
     {
+        if (access_type != AccessType::None)
+            accesses.insert_or_assign(address, std::make_pair("read16", access_type));
+
         return read(address) | (read(address + 1) << 8);
     }
 
     uint32_t read32(uint32_t address, AccessType access_type = AccessType::None)
     {  
+        if (access_type != AccessType::None)
+            accesses.insert_or_assign(address, std::make_pair("read32", access_type));
+
         return read(address) | 
             (read(address + 1) << 8) | 
             (read(address + 2) << 16) | 
@@ -162,9 +178,15 @@ public:
     void print_memory()
     {
         for (auto& [key, value] : memory)
-            std::cout << "[" << key << "]: " << +value << '\n';
+        {
+            std::cout << "[" << key << "]: " << value;
+        
+            if (auto it = memory.find(key); it != memory.end())
+                std::cout << " Access Type: " << (int)it->second << '\n';
+        }
     }
 
 private:
     std::unordered_map<uint32_t, uint8_t> memory{};
+    std::unordered_map<uint32_t, std::pair<std::string, AccessType>> accesses{};
 };
