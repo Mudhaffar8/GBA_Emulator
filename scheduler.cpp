@@ -22,19 +22,14 @@ void Scheduler::pop_event()
     event_queue.pop();
 }
 
-uint64_t Scheduler::get_next_event_cycles()
+Scheduler::Event Scheduler::get_next_event()
 {
     if (event_queue.empty())
     {
         std::cout << "Empty Event Queue\n";
-        return 0;
+        throw std::runtime_error("Empty Scheduler");
     }
-    return event_queue.top().cycles;
-}
-
-void Scheduler::advance(uint64_t cycles)
-{
-    global_cycles += cycles;
+    return event_queue.top();
 }
 
 void Scheduler::print_all()

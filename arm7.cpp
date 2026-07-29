@@ -4,6 +4,9 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "memory_regions.hpp"
+
+#ifndef RUN_JSON_TESTS
 Arm7TDMI::Arm7TDMI(Memory& _memory) : 
     memory(_memory),
     interrupt_enable(_memory),
@@ -12,13 +15,26 @@ Arm7TDMI::Arm7TDMI(Memory& _memory) :
 {
     // In normal GBAs, the FIQ signal is shortcut to VDD35, ie. the signal is always high, 
     // and there is no way to generate a FIQ by hardware.
+    pc = 8;
     cpsr |= ProgramStatusRegsiter::F | ArmMode::User;
 }
+#else
+Arm7TDMI::Arm7TDMI(TestMemory& _memory) : 
+    memory(_memory)
+{
+    // In normal GBAs, the FIQ signal is shortcut to VDD35, ie. the signal is always high, 
+    // and there is no way to generate a FIQ by hardware.
+    pc = 8;
+    cpsr |= ProgramStatusRegsiter::F | ArmMode::User;
+}
+#endif
 
 void Arm7TDMI::tick()
 {
+    #ifndef RUN_JSON_TESTS
     if (is_irq_enabled() && (interrupt_enable & interrupt_flag & 0x3FFF) != 0 && (ime & 1))
         handle_irq();
+    #endif
     
     if (is_thumb_mode())
     {
@@ -88,6 +104,16 @@ bool Arm7TDMI::check_condition_code(uint32_t code)
 /// @note Any method that changes the cpsr flags should call this function.
 void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 {
+    // If this was C++20, I'd mark this as likely
+    if (new_mode != ArmMode::FastInterrupt) 
+    {
+        registers[8] = &r8;
+        registers[9] = &r9;
+        registers[10] = &r10;
+        registers[11] = &r11;
+        registers[12] = &r12;
+    }
+
     cpsr &= ~ProgramStatusRegsiter::Mode;
     cpsr |= new_mode;
 
@@ -99,11 +125,6 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
     case ArmMode::User:
     case ArmMode::System:
         Utils::print("USER/SYSTEM\n");
-        registers[8] = &r8;
-        registers[9] = &r9;
-        registers[10] = &r10;
-        registers[11] = &r11;
-        registers[12] = &r12;
         registers[13] = &r13;
         registers[14] = &r14;
         break;
@@ -121,44 +142,24 @@ void Arm7TDMI::handle_mode_switch(uint32_t new_mode)
 
     case ArmMode::InterruptRequest:
         Utils::print("IRQ\n");
-        registers[8] = &r8;
-        registers[9] = &r9;
-        registers[10] = &r10;
-        registers[11] = &r11;
-        registers[12] = &r12;
         registers[13] = &r13_irq;
         registers[14] = &r14_irq;
         break;
 
     case ArmMode::Supervisor:
         Utils::print("SVC\n");
-        registers[8] = &r8;
-        registers[9] = &r9;
-        registers[10] = &r10;
-        registers[11] = &r11;
-        registers[12] = &r12;
         registers[13] = &r13_svc;
         registers[14] = &r14_svc;
         break;
 
     case ArmMode::Abort:
         Utils::print("ABT\n");
-        registers[8] = &r8;
-        registers[9] = &r9;
-        registers[10] = &r10;
-        registers[11] = &r11;
-        registers[12] = &r12;
         registers[13] = &r13_abt;
         registers[14] = &r14_abt;
         break;
 
     case ArmMode::Undefined:
         Utils::print("UND\n");
-        registers[8] = &r8;
-        registers[9] = &r9;
-        registers[10] = &r10;
-        registers[11] = &r11;
-        registers[12] = &r12;
         registers[13] = &r13_und;
         registers[14] = &r14_und;
         break;
@@ -200,7 +201,7 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
     uint32_t new_address = Utils::get_bits(address, 1, 32) << 1;
     if (address & 1)
     {
-        handle_state_switch(ArmState::Thumb);
+        handle_state_switch(ArmState::Thumb); 
         reload_pipeline16(new_address + 4);
     }
     else
@@ -222,7 +223,7 @@ void Arm7TDMI::handle_irq()
     handle_mode_switch(ArmMode::InterruptRequest);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    r14_fiq = pc - (is_thumb_mode() ? 2 : 4);
+    r14_irq = pc - (is_thumb_mode() ? 2 : 4);
     reload_pipeline32(Arm7VectorAddr::IRQ + 8);
 }
 

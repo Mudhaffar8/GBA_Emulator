@@ -3,6 +3,7 @@
 #include "io_register.hpp"
 #include "memory.hpp"
 #include "memory_regions.hpp"
+#include "graphics_settings.hpp"
 #include "utils.hpp"
 
 class Graphics
@@ -23,8 +24,8 @@ public:
         ScreenEnableBG2 = (1 << 10),
         ScreenEnableBG3 = (1 << 11),
         WindowEnableW0 = (1 << 12),
-        WindowEnableW1 = (1 << 12),
-        WindowEnableObj = (1 << 12),
+        WindowEnableW1 = (1 << 13),
+        WindowEnableObj = (1 << 14),
     };
 
     enum DispStat 
@@ -38,6 +39,10 @@ public:
         VCountSetting = 0xFF00, // Basically LYC (0..227)
     };
 
+    void render_scanline();
+
+    const std::array<uint32_t, GBARes::Resolution>& get_frame_buffer() const { return frame_buffer; }
+
 private:
     Memory& memory;
 
@@ -50,10 +55,10 @@ private:
     Io16<GBAIO::VCOUNT> scanline_y;
 
     // BG0-3 Toggle
-    Io16<GBAIO::BG0CNT> bg0_count;
-    Io16<GBAIO::BG1CNT> bg1_count;
-    Io16<GBAIO::BG2CNT> bg2_count;
-    Io16<GBAIO::BG3CNT> bg0_count;
+    Io16<GBAIO::BG0CNT> bg0_control;
+    Io16<GBAIO::BG1CNT> bg1_control;
+    Io16<GBAIO::BG2CNT> bg2_control;
+    Io16<GBAIO::BG3CNT> bg3_control;
 
     // BG0-3 X/Y Offsets
     Io16<GBAIO::BG0HOFS> bg0_x_offset;
@@ -93,4 +98,12 @@ private:
     Io16<GBAIO::BLDCNT> color_effects_select;
     Io16<GBAIO::BLDALPHA> alpha_blend_coefficients;
     Io16<GBAIO::BLDY> brightness_coefficient;
+
+    std::array<uint32_t, GBARes::LCD_H * GBARes::LCD_W> frame_buffer;
+
+    void render_scanline_mode3(int screen_y);
+    void render_scanline_mode4(int screen_y);
+    // void render_scanline_mode5(int screen_y);
+
+    uint32_t convert_bgr555_to_rgba32(uint16_t bgr);
 };

@@ -2,8 +2,14 @@
 
 #include <bitset>
 #include <cstdint>
+#include <exception>
 #include <iostream>
 #include <string_view>
+
+// Quick and dirty
+/// @todo Maybe find a more elegant way to do this without macros.
+/// @note Could use std::is_same_v<T, Memory> and templates
+// #define RUN_JSON_TESTS
 
 namespace Utils
 {
@@ -55,5 +61,16 @@ namespace Utils
         int32_t sign_extended_offset = (is_signed ? negative_bitmask : 0) | (unsigned_offset);
         
         return sign_extended_offset;
+    }
+
+    inline void do_bounds_check(uint32_t val, size_t start, size_t end)
+    {
+        if (val < start || val > end)
+        {
+            std::string s = "Out of Bounds! Value: " + std::to_string(val) + '\n';
+            s += "Range Start: " + std::to_string(start);
+            s += "Range End: " + std::to_string(end);
+            throw std::runtime_error(s);
+        }
     }
 };

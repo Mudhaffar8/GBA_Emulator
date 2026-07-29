@@ -28,6 +28,43 @@ namespace GBAMem
     constexpr uint32_t GAME_PAK_ROM_END = 0xDFFFFFF;
 }
 
+namespace GBACart
+{
+    constexpr uint32_t ENTRY_POINT = 0x8000000;
+
+    constexpr uint32_t NINTENDO_LOGO_START = 0x8000004;
+    constexpr uint32_t NINTENDO_LOGO_END = 0x800009F;
+
+    constexpr uint32_t GAME_TITLE_START = 0x80000A0;
+    constexpr uint32_t GAME_TITLE_END = 0x80000AB;
+
+    constexpr uint32_t GAME_CODE_START = 0x80000AC;
+    constexpr uint32_t GAME_CODE_END = 0x80000AF;
+
+    constexpr uint32_t MAKER_CODE_START = 0x80000B0;
+    constexpr uint32_t MAKER_CODE_END = 0x80000B1;
+
+    constexpr uint32_t FIXED_VALUE = 0x80000B2;
+    constexpr uint32_t MAIN_UNIT_CODE = 0x80000B3;
+    constexpr uint32_t DEVICE_TYPE = 0x80000B4;
+
+    constexpr uint32_t RESERVED_START = 0x80000B5;
+    constexpr uint32_t RESERVED_END = 0x80000BB;
+
+    constexpr uint32_t SOFTWARE_VERSION = 0x80000BC;
+    constexpr uint32_t COMPLEMENT_CHECK = 0x80000BD;
+
+    /* Additional Multiboot Header Entries */
+    constexpr uint32_t RAM_ENTRY_POINT_START = 0x80000C0;
+    constexpr uint32_t RAM_ENTRY_POINT_END = 0x80000C3;
+
+    constexpr uint32_t BOOT_MODE = 0x80000C4;
+    constexpr uint32_t SLAVE_ID = 0x80000C5;
+
+    constexpr uint32_t JOYBUS_ENTRY_START = 0x80000E0;
+    constexpr uint32_t JOYBUS_ENTRY_END = 0x80000E3;
+}
+
 namespace GBAIO
 {
     /* LCD Registers */

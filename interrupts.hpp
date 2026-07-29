@@ -29,7 +29,8 @@ namespace GBAInterrupts
     inline void disable_interrupt(Memory& mem, Interrupts interrupt) {}
 
     /* Checking Interrupts */
-    inline bool is_interrupt_queued(Memory& mem, Interrupts interrupt) {} // Check if interrupt is request and enabled
-    inline bool is_interrupt_requested(Memory& mem, Interrupts interrupt) {}
-    inline bool is_interrupt_enabled(Memory& mem, Interrupts interrupt) {}
+    // // Check if interrupt is request and enabled
+    inline bool is_interrupt_queued(Memory& mem, Interrupts interrupt) { return false; } 
+    inline bool is_interrupt_requested(Memory& mem, Interrupts interrupt) { return false; }
+    inline bool is_interrupt_enabled(Memory& mem, Interrupts interrupt) { return false; }
 }

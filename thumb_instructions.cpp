@@ -126,7 +126,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_alu_operations(uint16_t opcode)
             if (first_8_bits == 0)
                 set_negative_and_zero(dest_register);
             else if (first_8_bits < 32) 
-                dest_register = alu_asr(dest_register, src_register, true);
+                dest_register = alu_asr(dest_register, first_8_bits, true);
             else if (first_8_bits >= 32)
             {
                 bool msb_is_set = Utils::is_bit_set(dest_register, 31);

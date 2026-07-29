@@ -24,7 +24,7 @@ public:
         if (val != other_val) 
         {
             // To prevent printing the ascii character instead of number for uint8_t, uint16_t etc.
-            if constexpr (std::is_arithmetic<T>::value) 
+            if constexpr (std::is_integral<T>::value) 
             {
                 if constexpr (print_bits)
                     std::cout << name << " Expected: " << std::bitset<32>(other_val) << "\n Got: " << std::bitset<32>(+val) << '\n';

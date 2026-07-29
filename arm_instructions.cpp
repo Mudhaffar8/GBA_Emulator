@@ -1088,6 +1088,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_undefined(uint32_t opcode)
 {
     Utils::print("ARM Undefined\n");
 
+    // Any Coprocesser instructions would also trigger this
     // assert(Utils::get_bits(opcode, 25, 28) == 0b011);
     // assert(Utils::is_bit_set(opcode, 4));
 

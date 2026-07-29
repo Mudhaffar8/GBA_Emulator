@@ -27,9 +27,12 @@ namespace Arm7VectorAddr
 class Arm7TDMI 
 {
 public:
-    /// @todo Add a simple way to switch (at compile-time) between Memory and TestMemory.
+    #ifndef RUN_JSON_TESTS
     explicit Arm7TDMI(Memory& memory);
-
+    #else
+    explicit Arm7TDMI(TestMemory& memory);
+    #endif
+    
     void tick();
 
 private:    
@@ -93,11 +96,17 @@ private:
     using ArmFunc = NextPCFetch (Arm7TDMI::*)(uint32_t opcode);
     using ThumbFunc = NextPCFetch (Arm7TDMI::*)(uint16_t opcode);
 
+    #ifndef RUN_JSON_TESTS
     Memory& memory;
+    #else
+    TestMemory& memory;
+    #endif
 
+    #ifndef RUN_JSON_TESTS
     Io16<GBAIO::IE> interrupt_enable;
     Io16<GBAIO::IF> interrupt_flag;
     Io16<GBAIO::IME> ime;
+    #endif
 
     /// @todo Make these static
     std::array<ArmFunc, 4096> arm_instr_table = generate_arm_table();

@@ -31,6 +31,10 @@ public:
     template <typename T>
     void write(T value, uint32_t address, AccessType access_type);
 
+    /* Loading ROMs */
+    bool load_bios(std::string file_name);
+    bool load_rom(std::string file_name);
+
     /* Cycle Counting */
     void get_cycles(uint32_t address, AccessType access_type);
     void add_internal_cycles(uint64_t cycles_to_advance = 1);
@@ -62,6 +66,27 @@ public:
         std::memcpy(&io_registers[address - 0x4000000], &word, sizeof(uint32_t));
     }
 
+    uint16_t read_vram16(uint32_t address)
+    {
+        uint16_t val{};
+        std::memcpy(&val, &vram[address - GBAMem::VRAM_START], sizeof(uint16_t));
+        return val;
+    }
+
+    uint16_t read_oam16(uint32_t address)
+    {
+        uint16_t val{};
+        std::memcpy(&val, &oam_data[address - GBAMem::OAM_START], sizeof(uint16_t));
+        return val;
+    }
+
+    uint16_t read_palette_data16(uint32_t address)
+    {
+        uint16_t val{};
+        std::memcpy(&val, &palette_data[address - GBAMem::BG_OBJ_PALETTE_DATA_START], sizeof(uint16_t));
+        return val;
+    }
+
 private: 
     Scheduler& scheduler;
     
@@ -76,7 +101,6 @@ private:
     std::array<uint8_t, 0x400> io_registers{};
     std::array<uint8_t, 0x400> oam_data{};
 
-    //  Turns out there are consequences for putting everything on the stack 
     std::vector<uint8_t> game_pak_rom;
     std::vector<uint8_t> game_pak_sram;
 };
@@ -86,7 +110,8 @@ T Memory::read(uint32_t address, AccessType access_type)
 {
     static_assert(std::is_same<T, uint32_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, uint8_t>::value);
 
-    get_cycles(address, access_type);
+    if (access_type != AccessType::None)
+        get_cycles(address, access_type);
 
     T val{};
 
@@ -125,7 +150,8 @@ void Memory::write(T val, uint32_t address, AccessType access_type)
 {
     static_assert(std::is_same<T, uint32_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, uint8_t>::value);
 
-    get_cycles(address, access_type);
+    if (access_type != AccessType::None)
+        get_cycles(address, access_type);
 
     switch(address & 0xF000000)
     {

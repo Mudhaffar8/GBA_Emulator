@@ -3,3 +3,5 @@
 **/v1/
 json.hpp
 **/.vscode/
+*.dll
+.gba

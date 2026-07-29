@@ -31,9 +31,17 @@ public:
     void add_event(EventType event_type, uint64_t event_cycles);
     void pop_event();
 
-    uint64_t get_next_event_cycles();
+    Event get_next_event();
 
-    void advance(uint64_t cycles);
+    bool next_event_pending()
+    {
+        return global_cycles >= event_queue.top().cycles;
+    }
+
+    void advance(uint64_t cycles)
+    {
+        global_cycles += cycles;
+    }
 
     /* Debugging */
     void print_all();

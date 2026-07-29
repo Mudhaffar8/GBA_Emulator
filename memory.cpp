@@ -1,8 +1,10 @@
 #include "memory.hpp"
 
-#include <stdexcept>
-
 #include "utils.hpp"
+
+#include <stdexcept>
+#include <fstream>
+#include <filesystem>
 
 Memory::Memory(Scheduler& _scheduler) : 
     scheduler(_scheduler),
@@ -22,6 +24,34 @@ void Memory::add_internal_cycles(uint64_t cycles_to_advance)
     scheduler.advance(cycles_to_advance);
 }
 
+bool Memory::load_bios(std::string path)
+{
+    std::ifstream file(path, std::ios::in | std::ios::binary);
+
+    if (!file.is_open()) 
+    {
+        std::cerr << "File does not exist: " << path << std::endl;
+        return false;
+    }
+
+    size_t file_size = static_cast<size_t>(std::filesystem::file_size(path));
+    if (file_size > GBAMem::SYSTEM_ROM_END+1)
+    {
+        std::cerr << "File size is too large" << std::endl;
+        return false;
+    }
+
+    file.seekg(0, std::ios::beg);
+    file.read(reinterpret_cast<char*>(system_rom.data()), system_rom.size());
+
+    return true;
+}
+
+bool Memory::load_rom(std::string path)
+{
+    return false;
+}
+
 void Memory::get_cycles(uint32_t address, AccessType access_type)
 {
     uint64_t cycles{};
@@ -29,8 +59,8 @@ void Memory::get_cycles(uint32_t address, AccessType access_type)
     switch(address & 0xF000000)
     {
     case 0x0000000: cycles = 1; break; // BIOS
-    case 0x2000000: cycles = 1; break; // IWRAM, 32-bit data bus
-    case 0x3000000: cycles = 3; break; // EWRAM, 16-bit data bus
+    case 0x2000000: cycles = 3; break; // EWRAM, 16-bit data bus
+    case 0x3000000: cycles = 1; break; // IWRAM, 32-bit data bus
     case 0x4000000: cycles = 1; break; // IO Registers
     case 0x5000000: cycles = 1; break; // Palette 
     case 0x6000000: cycles = 1; break; // VRAM, 16-bit data bus
@@ -78,7 +108,7 @@ void Memory::get_cycles(uint32_t address, AccessType access_type)
         cycles = WAITSTATE_CTRL_TABLE[0][Utils::get_bits(read_io16(GBAIO::WAITCNT), 0, 2)];
         break;
 
-    default: throw std::runtime_error("Invalid Read Address: " + std::to_string(address));
+    default: throw std::runtime_error("Invalid Address: " + std::to_string(address));
     }
 
     scheduler.advance(cycles);
