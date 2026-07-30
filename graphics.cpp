@@ -45,23 +45,23 @@ Graphics::Graphics(Memory& _memory) :
 void Graphics::render_scanline()
 {
     render_scanline_mode3(static_cast<int>(scanline_y));
-    scanline_y = (scanline_y >= GBARes::LCD_H-1) ? 0 : scanline_y + 1;
+    scanline_y = (scanline_y >= 227) ? 0 : scanline_y + 1;
 }
 
 // Standard 16-bit bitmapped (non-paletted) 240x160 mode.
 void Graphics::render_scanline_mode3(int screen_y)
 {
-    assert(screen_y < GBARes::LCD_H);
+    if (screen_y >= GBARes::LCD_H) return;
 
     // No way Mode 3 is this easy?
     // There has to be some hidden complexity
     // or obscure edge case I need to implement
 
     int height = GBARes::LCD_W * screen_y;
-    
+
     for (int x = 0; x < GBARes::LCD_W; ++x)
     {
-        uint16_t color = memory.read_vram16(GBAMem::VRAM_START + x*2 + height);
+        uint16_t color = memory.read_vram16((x + height) * 2);
         frame_buffer.at(x + height) = convert_bgr555_to_rgba32(color);
     }
 }

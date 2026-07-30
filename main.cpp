@@ -1,6 +1,4 @@
 #include <iostream>
-#include <bitset>
-#include <limits>
 
 #include "arm7.hpp"
 #include "display.hpp"
@@ -22,17 +20,26 @@ int main(int argc, char** argv)
     GBATests::run_all_tests(cpu, test_memory);
 
     #else
+
+    if (argc < 3)
+    {
+        std::cout << "Invalid # of Arguments\n";
+        exit(1);
+    }
+
     Scheduler scheduler;
     scheduler.add_event(Scheduler::EventType::HBlank, GBATiming::HDRAW);
     scheduler.add_event(Scheduler::EventType::VBlank, GBATiming::VDRAW);
 
     Memory memory(scheduler);
-    memory.write<uint32_t>(0xE1A00000, 0, AccessType::None); // MOV r0, r0 (nop)
-    memory.write<uint32_t>(0xEAFFFFFE, 4, AccessType::None); // B 0
-
-    // Some Blue-ish Colour
-    for (int i = 0; i < GBARes::Resolution * 2; i += 2)
-        memory.write<uint16_t>(0x7B36, GBAMem::VRAM_START + i, AccessType::None);
+    
+    bool load_rom_success = memory.load_rom(std::string("./test_roms/") + argv[1]);
+    bool load_bios_success = memory.load_bios(std::string("./test_roms/") + argv[2]);
+    if (!load_rom_success || !load_bios_success)
+    {
+        std::cout << "File(s) Not Found!\n";
+        exit(1);
+    }
 
     Arm7TDMI cpu(memory);
     Graphics ppu(memory);
@@ -46,18 +53,20 @@ int main(int argc, char** argv)
         Scheduler::Event event = scheduler.get_next_event();
         scheduler.pop_event();
 
+        int late_cycles = scheduler.get_global_cycles() - event.cycles;
+
         switch (event.event_type)
         {
         case Scheduler::EventType::VBlank:
             display.handle_events();
             display.update_screen(ppu.get_frame_buffer());
-            scheduler.add_event(Scheduler::EventType::VBlank, GBATiming::VDRAW);
+            scheduler.add_event(Scheduler::EventType::VBlank, GBATiming::REFRESH_RATE - late_cycles);
             break;
 
         case Scheduler::EventType::HBlank:
             // If NOT in VBlank
             ppu.render_scanline();
-            scheduler.add_event(Scheduler::EventType::HBlank, GBATiming::HDRAW);
+            scheduler.add_event(Scheduler::EventType::HBlank, GBATiming::SCANLINE - late_cycles);
             break;
         
         default:

@@ -43,6 +43,8 @@ public:
         global_cycles += cycles;
     }
 
+    uint64_t get_global_cycles() { return global_cycles; }
+
     /* Debugging */
     void print_all();
 

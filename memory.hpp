@@ -26,10 +26,10 @@ public:
     Memory(Scheduler& scheduler);
 
     template <typename T>
-    T read(uint32_t address, AccessType access_type);
+    T read(uint32_t address, AccessType access_type = AccessType::None);
 
     template <typename T>
-    void write(T value, uint32_t address, AccessType access_type);
+    void write(T value, uint32_t address, AccessType access_type = AccessType::None);
 
     /* Loading ROMs */
     bool load_bios(std::string file_name);
@@ -69,7 +69,7 @@ public:
     uint16_t read_vram16(uint32_t address)
     {
         uint16_t val{};
-        std::memcpy(&val, &vram[address - GBAMem::VRAM_START], sizeof(uint16_t));
+        std::memcpy(&val, &vram[address], sizeof(uint16_t));
         return val;
     }
 

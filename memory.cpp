@@ -47,9 +47,28 @@ bool Memory::load_bios(std::string path)
     return true;
 }
 
+/// @todo Perform Header checks
 bool Memory::load_rom(std::string path)
 {
-    return false;
+    std::ifstream file(path, std::ios::in | std::ios::binary);
+
+    if (!file.is_open()) 
+    {
+        std::cerr << "File does not exist: " << path << std::endl;
+        return false;
+    }
+
+    size_t file_size = static_cast<size_t>(std::filesystem::file_size(path));
+    if (file_size > (GBAMem::GAME_PAK_ROM_END - GBAMem::GAME_PAK_ROM_START +1))
+    {
+        std::cerr << "File size is too large" << std::endl;
+        return false;
+    }
+
+    file.seekg(0, std::ios::beg);
+    file.read(reinterpret_cast<char*>(game_pak_rom.data()), game_pak_rom.size());
+
+    return true;
 }
 
 void Memory::get_cycles(uint32_t address, AccessType access_type)

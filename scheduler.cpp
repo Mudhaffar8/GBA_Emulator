@@ -22,6 +22,7 @@ void Scheduler::pop_event()
     event_queue.pop();
 }
 
+/// @todo Account for "late" cycles
 Scheduler::Event Scheduler::get_next_event()
 {
     if (event_queue.empty())
