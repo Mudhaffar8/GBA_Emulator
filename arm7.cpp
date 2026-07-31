@@ -15,6 +15,7 @@ Arm7TDMI::Arm7TDMI(Memory& _memory) :
 {
     // In normal GBAs, the FIQ signal is shortcut to VDD35, ie. the signal is always high, 
     // and there is no way to generate a FIQ by hardware.
+    r13 = r13_abt = r13_fiq = r13_irq = r13_svc = r13_und = 0x03007F00;
     pc = GBACart::ENTRY_POINT + 8;
     cpsr |= ProgramStatusRegsiter::F | ArmMode::System;
 }
@@ -29,7 +30,6 @@ Arm7TDMI::Arm7TDMI(TestMemory& _memory) :
 }
 #endif
 
-int jj = 0;
 void Arm7TDMI::tick()
 {
     #ifndef RUN_JSON_TESTS
@@ -216,7 +216,7 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
 /// @note This might be 1S cycle off.
 void Arm7TDMI::handle_irq()
 {
-    Utils::print("IRQ\n");
+    std::cout << "IRQ\n";
 
     spsr_irq = cpsr;
 

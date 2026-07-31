@@ -2,7 +2,7 @@
 
 #include "memory.hpp"
 
-enum Interrupts
+enum class Interrupts
 {
     Vblank = (1 << 0),
     Hblank = (1 << 1),
@@ -22,14 +22,18 @@ enum Interrupts
 
 namespace GBAInterrupts
 {
-    inline void request_interrupt(Memory& mem, Interrupts interrupt) {}
+    inline void request_interrupt(Memory& mem, Interrupts interrupt) 
+    {
+        uint16_t if_flag = mem.read_io16(GBAIO::IF);
+        mem.write_io16(if_flag | static_cast<uint16_t>(interrupt), GBAIO::IF);
+    }
     inline void unset_interrupt(Memory& mem, Interrupts interrupt) {}
 
     inline void enable_interrupt(Memory& mem, Interrupts interrupt) {}
     inline void disable_interrupt(Memory& mem, Interrupts interrupt) {}
 
     /* Checking Interrupts */
-    // // Check if interrupt is request and enabled
+    // Check if interrupt is request and enabled
     inline bool is_interrupt_queued(Memory& mem, Interrupts interrupt) { return false; } 
     inline bool is_interrupt_requested(Memory& mem, Interrupts interrupt) { return false; }
     inline bool is_interrupt_enabled(Memory& mem, Interrupts interrupt) { return false; }

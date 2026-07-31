@@ -1,5 +1,7 @@
 #include "graphics.hpp"
 
+#include "interrupts.hpp"
+
 #include <cassert>
 
 Graphics::Graphics(Memory& _memory) : 
@@ -44,14 +46,35 @@ Graphics::Graphics(Memory& _memory) :
 
 void Graphics::render_scanline()
 {
-    render_scanline_mode3(static_cast<int>(scanline_y));
+    int graphics_mode = dispcnt & Dispcnt::BgMode;
+    
+    switch(graphics_mode)
+    {
+        case 0: break;
+        case 1: break;
+        case 2: break;
+        case 3: render_scanline_mode3(static_cast<int>(scanline_y)); break;
+        case 4: render_scanline_mode4(static_cast<int>(scanline_y)); break;
+        case 5: break;
+        default: throw std::runtime_error("Invalid Graphics Mode: " + std::to_string(graphics_mode)); break;
+    }
+
     scanline_y = (scanline_y >= 227) ? 0 : scanline_y + 1;
+
+    if (scanline_y >= GBARes::LCD_H)
+    {
+        dispstat |= DispStat::VBlankFlag;
+        if (dispstat & DispStat::VBlankIRQEnable)
+            GBAInterrupts::request_interrupt(memory, Interrupts::Vblank);
+    }
+    else if (scanline_y < GBARes::LCD_H)    
+        dispstat &= ~DispStat::VBlankFlag;
 }
 
 // Standard 16-bit bitmapped (non-paletted) 240x160 mode.
 void Graphics::render_scanline_mode3(int screen_y)
 {
-    if (screen_y >= GBARes::LCD_H) return;
+    if (scanline_y >= GBARes::LCD_H) return;
 
     // No way Mode 3 is this easy?
     // There has to be some hidden complexity
@@ -68,14 +91,27 @@ void Graphics::render_scanline_mode3(int screen_y)
 
 void Graphics::render_scanline_mode4(int screen_y)
 {
-    uint32_t bitmap_start_addr = Utils::is_bit_set(dispcnt, 4) ? 0x06000000 : 0x0600A000;
+    if (scanline_y >= GBARes::LCD_H) return;
+
+    uint32_t bitmap_start_addr = Utils::is_bit_set(dispcnt, Dispcnt::DispFrameSelect) ? 0x06000000 : 0x0600A000;
 
     int height = GBARes::LCD_W * screen_y;
     
-    (void)bitmap_start_addr;
-    (void)height;
-    
-    // for (int x = 0; x < GBARes::LCD_W; ++x) {}
+    // Divide by 2 since we can do two writes at once
+    for (int x = 0; x < GBARes::LCD_W; x += 2) 
+    {
+        int coords = x + height;
+
+        uint16_t palette_indices = memory.read_vram16(bitmap_start_addr + coords);
+        uint8_t palette_index1 = palette_indices >> 8;
+        uint8_t palette_index2 = palette_indices & 0xFF;
+
+        uint16_t color1 = memory.read_palette_data16(palette_index1);
+        uint16_t color2 = memory.read_palette_data16(palette_index2);
+
+        frame_buffer.at(coords) = convert_bgr555_to_rgba32(color1);
+        frame_buffer.at(coords + 1) = convert_bgr555_to_rgba32(color2);
+    }
 }
 
 uint32_t Graphics::convert_bgr555_to_rgba32(uint16_t bgr)

@@ -35,7 +35,6 @@ public:
     
     void tick();
 
-private:    
     enum ConditionCode
     {
         EQ = 0b0000, // Equal, Z = 1

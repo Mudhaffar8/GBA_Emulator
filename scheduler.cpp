@@ -17,12 +17,11 @@ void Scheduler::pop_event()
     if (event_queue.empty())
     {
         std::cout << "Empty Event Queue\n";
-        return;
+        throw std::runtime_error("Empty Scheduler");
     }
     event_queue.pop();
 }
 
-/// @todo Account for "late" cycles
 Scheduler::Event Scheduler::get_next_event()
 {
     if (event_queue.empty())

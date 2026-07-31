@@ -5,6 +5,7 @@
 #include <exception>
 #include <iostream>
 #include <string_view>
+#include <sstream>
 
 // Quick and dirty
 /// @todo Maybe find a more elegant way to do this without macros.
@@ -29,12 +30,12 @@ namespace Utils
             std::cout << what;
     }
     
-    inline bool is_bit_set(uint32_t val, uint32_t bit_to_check)
+    constexpr bool is_bit_set(uint32_t val, uint32_t bit_to_check)
     {   
         return (val >> bit_to_check) & 1;
     }
 
-    inline uint32_t get_bits(uint32_t val, int bit_start, int bit_end)
+    constexpr uint32_t get_bits(uint32_t val, int bit_start, int bit_end)
     {
         return (val >> bit_start) & ((1 << (bit_end - bit_start)) - 1);
     }
@@ -63,13 +64,23 @@ namespace Utils
         return sign_extended_offset;
     }
 
-    inline void do_bounds_check(uint32_t val, size_t start, size_t end)
+    inline std::string int_to_hex(int num)
+    {
+        std::stringstream stream;
+
+        if (num < 0x10) stream << "0";
+        stream << std::hex << num;
+
+        return stream.str();
+    }
+
+    inline void do_bounds_check(uint32_t val, size_t start, size_t end, std::string name)
     {
         if (val < start || val > end)
         {
-            std::string s = "Out of Bounds! Value: " + std::to_string(val) + '\n';
-            s += "Range Start: " + std::to_string(start);
-            s += "Range End: " + std::to_string(end);
+            std::string s = "Out of Bounds!" + name + " Value: " + int_to_hex(val) + '\n';
+            s += "Range Start: " + int_to_hex(start);
+            s += "\nRange End: " + int_to_hex(end);
             throw std::runtime_error(s);
         }
     }

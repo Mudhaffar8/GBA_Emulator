@@ -76,14 +76,14 @@ public:
     uint16_t read_oam16(uint32_t address)
     {
         uint16_t val{};
-        std::memcpy(&val, &oam_data[address - GBAMem::OAM_START], sizeof(uint16_t));
+        std::memcpy(&val, &oam_data[address], sizeof(uint16_t));
         return val;
     }
 
     uint16_t read_palette_data16(uint32_t address)
     {
         uint16_t val{};
-        std::memcpy(&val, &palette_data[address - GBAMem::BG_OBJ_PALETTE_DATA_START], sizeof(uint16_t));
+        std::memcpy(&val, &palette_data[address], sizeof(uint16_t));
         return val;
     }
 
@@ -118,13 +118,26 @@ T Memory::read(uint32_t address, AccessType access_type)
     // The memory map is so clean :o
     switch(address & 0xF000000)
     {
-    case 0x0000000: std::memcpy(&val, system_rom.data(), sizeof(T)); break;
-    case 0x2000000: std::memcpy(&val, external_ram.data() + (address - 0x2000000), sizeof(T)); break;
-    case 0x3000000: std::memcpy(&val, internal_ram.data() + (address - 0x3000000), sizeof(T)); break;
-    case 0x4000000: std::memcpy(&val, io_registers.data() + (address - 0x4000000), sizeof(T)); break;
-    case 0x5000000: std::memcpy(&val, palette_data.data() + (address - 0x5000000), sizeof(T)); break;
-    case 0x6000000: std::memcpy(&val, vram.data() + (address - 0x6000000), sizeof(T)); break;
-    case 0x7000000: std::memcpy(&val, oam_data.data() + (address - 0x7000000), sizeof(T)); break;
+    case 0x0000000: 
+        Utils::do_bounds_check(address, 0, GBAMem::SYSTEM_ROM_END, "READ BIOS");
+        std::memcpy(&val, system_rom.data() + address, sizeof(T)); break;
+    case 0x2000000: 
+        Utils::do_bounds_check(address, GBAMem::EWRAM_START, GBAMem::EWRAM_END, "READ EWRAM");
+        std::memcpy(&val, external_ram.data() + (address - 0x2000000), sizeof(T)); break;
+    case 0x3000000: 
+        std::memcpy(&val, internal_ram.data() + (address & 0x7FFF), sizeof(T)); break;
+    case 0x4000000: 
+        Utils::do_bounds_check(address, GBAMem::IO_REGISTERS_START, GBAMem::IO_REGISTERS_END, "READ IO");
+        std::memcpy(&val, io_registers.data() + (address - 0x4000000), sizeof(T)); break;
+    case 0x5000000: 
+        Utils::do_bounds_check(address, GBAMem::BG_OBJ_PALETTE_DATA_START, GBAMem::BG_OBJ_PALETTE_DATA_END, "READ PALETTE");
+        std::memcpy(&val, palette_data.data() + (address - 0x5000000), sizeof(T)); break;
+    case 0x6000000: 
+        Utils::do_bounds_check(address, GBAMem::VRAM_START, GBAMem::VRAM_END, "READ VRAM");
+        std::memcpy(&val, vram.data() + (address - 0x6000000), sizeof(T)); break;
+    case 0x7000000: 
+        Utils::do_bounds_check(address, GBAMem::OAM_START, GBAMem::OAM_END, "READ OAM");
+        std::memcpy(&val, oam_data.data() + (address - 0x7000000), sizeof(T)); break;
     
     case 0x8000000: 
     case 0x9000000:     
@@ -155,13 +168,28 @@ void Memory::write(T val, uint32_t address, AccessType access_type)
 
     switch(address & 0xF000000)
     {
-    case 0x0000000: std::memcpy(system_rom.data(), &val, sizeof(T)); break;
-    case 0x2000000: std::memcpy(external_ram.data() + (address - 0x2000000), &val, sizeof(T)); break;
-    case 0x3000000: std::memcpy(internal_ram.data() + (address - 0x3000000), &val, sizeof(T)); break;
-    case 0x4000000: std::memcpy(io_registers.data() + (address - 0x4000000), &val, sizeof(T)); break;
-    case 0x5000000: std::memcpy(palette_data.data() + (address - 0x5000000), &val, sizeof(T)); break;
-    case 0x6000000: std::memcpy(vram.data() + (address - 0x6000000), &val, sizeof(T)); break;
-    case 0x7000000: std::memcpy(oam_data.data() + (address - 0x7000000), &val, sizeof(T)); break;
+    case 0x0000000: 
+        Utils::do_bounds_check(address, 0, GBAMem::SYSTEM_ROM_END, "WRITE SYSTEM ROM");
+        std::cout << "You can't write to SYSTEM ROM!\n";
+        // std::memcpy(system_rom.data(), &val, sizeof(T));
+        break;
+    case 0x2000000: 
+        Utils::do_bounds_check(address, GBAMem::EWRAM_START, GBAMem::EWRAM_END, "WRITE EWRAM");
+        std::memcpy(external_ram.data() + (address - 0x2000000), &val, sizeof(T)); break;
+    case 0x3000000: 
+        std::memcpy(internal_ram.data() + ((address - 0x3000000) & 0x7FFF), &val, sizeof(T)); break;
+    case 0x4000000: 
+        Utils::do_bounds_check(address, GBAMem::IO_REGISTERS_START, GBAMem::IO_REGISTERS_END, "WRITE IO");
+        std::memcpy(io_registers.data() + (address - 0x4000000), &val, sizeof(T)); break;
+    case 0x5000000: 
+        Utils::do_bounds_check(address, GBAMem::BG_OBJ_PALETTE_DATA_START, GBAMem::BG_OBJ_PALETTE_DATA_END, "WRITE PALETTE");
+        std::memcpy(palette_data.data() + (address - 0x5000000), &val, sizeof(T)); break;
+    case 0x6000000: 
+        Utils::do_bounds_check(address, GBAMem::VRAM_START, GBAMem::VRAM_END, "WRITE VRAM");
+        std::memcpy(vram.data() + (address - 0x6000000), &val, sizeof(T)); break;
+    case 0x7000000: 
+        Utils::do_bounds_check(address, GBAMem::OAM_START, GBAMem::OAM_END, "WRITE IO");
+        std::memcpy(oam_data.data() + (address - 0x7000000), &val, sizeof(T)); break;
     
     case 0x8000000: 
     case 0x9000000:     

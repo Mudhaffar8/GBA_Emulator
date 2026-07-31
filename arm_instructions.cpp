@@ -1066,7 +1066,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
 // 2S + 1N Cycles
 Arm7TDMI::NextPCFetch Arm7TDMI::arm_software_interrupt(uint32_t opcode)
 {
-    Utils::print("ARM Software Interrupt\n");
+    std::cout << ("ARM Software Interrupt\n");
 
     assert(Utils::get_bits(opcode, 24, 28) == 0b1111);
 

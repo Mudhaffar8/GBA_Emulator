@@ -26,7 +26,7 @@ void Memory::add_internal_cycles(uint64_t cycles_to_advance)
 
 bool Memory::load_bios(std::string path)
 {
-    std::ifstream file(path, std::ios::in | std::ios::binary);
+    std::ifstream file(path,  std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
 
     if (!file.is_open()) 
     {
@@ -43,6 +43,7 @@ bool Memory::load_bios(std::string path)
 
     file.seekg(0, std::ios::beg);
     file.read(reinterpret_cast<char*>(system_rom.data()), system_rom.size());
+    file.close();
 
     return true;
 }
@@ -67,6 +68,7 @@ bool Memory::load_rom(std::string path)
 
     file.seekg(0, std::ios::beg);
     file.read(reinterpret_cast<char*>(game_pak_rom.data()), game_pak_rom.size());
+    file.close();
 
     return true;
 }
