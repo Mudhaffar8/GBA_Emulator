@@ -74,7 +74,7 @@ private:
         std::string dst_reg = "R" + std::to_string(dst_reg_index);
         std::string src_reg = "R" + std::to_string(src_reg_index);
 
-        return {dst_reg, src_reg};
+        return {src_reg, dst_reg};
     }
     
     // Bits 0-3

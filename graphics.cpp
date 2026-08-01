@@ -49,9 +49,29 @@ void Graphics::enter_hblank()
 
 }
 
+/*
+The program seems to be stuck in this loop.
+So no page flipping seems to happen.
+Seems to apply to any Tonc program that uses VBlankInterruptWait
+    Address: 0x4cc: STRH R6, [R2, R12]
+    Address: 0x4d0: B #0xffffffe2
+    Address: 0x49c: STRB R5, [R2, #0x301]
+    Address: 0x4a0: STRH R7, [R2, R12]
+    Address: 0x4a4: LDRH R3, [R4, #-0x7]
+    Address: 0x4a8: ANDS R1, R0, R3
+    Address: 0x4ac: EOR R3, R1, R3
+    Address: 0x4b0: BEQ #0xa
+*/
 void Graphics::enter_vblank()
 {
+    dispstat = Utils::set_bit(dispstat, DispStat::VBlankFlag, true);
+    if (dispstat & DispStat::VBlankIRQEnable)
+        GBAInterrupts::request_interrupt(memory, Interrupts::Vblank);
+}
 
+void Graphics::exit_vblank()
+{
+    dispstat = Utils::set_bit(dispstat, DispStat::VBlankFlag, false);
 }
 
 void Graphics::render_scanline()
@@ -63,8 +83,8 @@ void Graphics::render_scanline()
         case 0: break;
         case 1: break;
         case 2: break;
-        case 3: render_scanline_mode3(static_cast<int>(scanline_y)); break;
-        case 4: render_scanline_mode4(static_cast<int>(scanline_y)); break;
+        case 3: render_scanline_mode3(scanline_y); break;
+        case 4: render_scanline_mode4(scanline_y); break;
         case 5: break;
         default: throw std::runtime_error("Invalid Graphics Mode: " + std::to_string(graphics_mode)); break;
     }
@@ -73,7 +93,7 @@ void Graphics::render_scanline()
 }
 
 // Standard 16-bit bitmapped (non-paletted) 240x160 mode.
-void Graphics::render_scanline_mode3(int screen_y)
+void Graphics::render_scanline_mode3(uint32_t screen_y)
 {
     if (scanline_y >= GBARes::LCD_H) return;
 
@@ -90,26 +110,23 @@ void Graphics::render_scanline_mode3(int screen_y)
     }
 }
 
-void Graphics::render_scanline_mode4(int screen_y)
+void Graphics::render_scanline_mode4(uint32_t screen_y)
 {
     if (scanline_y >= GBARes::LCD_H) return;
 
-    uint32_t bitmap_start_addr = Utils::is_bit_set(dispcnt, Dispcnt::DispFrameSelect) ? 0x06000000 : 0x0600A000;
-
-    int height = GBARes::LCD_W * screen_y;
+    uint32_t bitmap_start_addr = (dispcnt & Dispcnt::DispFrameSelect) ? 0xA000 : 0;
+    uint32_t height = GBARes::LCD_W * screen_y;
     
-    // Divide by 2 since we can do two writes at once
     for (int x = 0; x < GBARes::LCD_W; x += 2) 
     {
         int coords = x + height;
 
-        // Okay this prolly the bug lol
         uint16_t palette_indices = memory.read_vram16(bitmap_start_addr + coords);
-        uint8_t palette_index1 = palette_indices >> 8;
-        uint8_t palette_index2 = palette_indices & 0xFF;
+        uint8_t palette_index1 = palette_indices & 0xFF;
+        uint8_t palette_index2 = palette_indices >> 8;
 
-        uint16_t color1 = memory.read_palette_data16(palette_index1);
-        uint16_t color2 = memory.read_palette_data16(palette_index2);
+        uint16_t color1 = memory.read_palette_data16(palette_index1 * 2);
+        uint16_t color2 = memory.read_palette_data16(palette_index2 * 2);
 
         frame_buffer.at(coords) = convert_bgr555_to_rgba32(color1);
         frame_buffer.at(coords + 1) = convert_bgr555_to_rgba32(color2);

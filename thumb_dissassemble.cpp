@@ -275,7 +275,11 @@ std::string Arm7Dissassembler::thumb_push_pop_registers_dissassemble(uint16_t op
         first_entry = true;
     }
 
-    if (pc_lr_bit) instruction += (is_pop) ? "PC " : "LR";
+    if (pc_lr_bit) 
+    {
+        if (first_entry) instruction += ", ";
+        instruction += (is_pop) ? "PC" : "LR";
+    }
     instruction += " }";
 
     return instruction;

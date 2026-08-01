@@ -41,6 +41,7 @@ public:
 
     void enter_hblank();
     void enter_vblank();
+    void exit_vblank();
 
     void render_scanline();
 
@@ -104,8 +105,8 @@ private:
 
     std::array<uint32_t, GBARes::LCD_H * GBARes::LCD_W> frame_buffer;
 
-    void render_scanline_mode3(int screen_y);
-    void render_scanline_mode4(int screen_y);
+    void render_scanline_mode3(uint32_t screen_y);
+    void render_scanline_mode4(uint32_t screen_y);
     // void render_scanline_mode5(int screen_y);
 
     uint32_t convert_bgr555_to_rgba32(uint16_t bgr);

@@ -40,9 +40,10 @@ namespace Utils
         return (val >> bit_start) & ((1 << (bit_end - bit_start)) - 1);
     }
 
-    constexpr void set_bit(uint32_t& val, uint32_t bit_to_check, bool cond)
+    constexpr uint32_t set_bit(uint32_t val, uint32_t bit_to_check, bool cond)
     {
         val = (cond) ? (val | bit_to_check) : (val & ~bit_to_check);
+        return val;
     }
 
     constexpr void set_bits(uint32_t& val, uint32_t bits_to_set, bool cond)

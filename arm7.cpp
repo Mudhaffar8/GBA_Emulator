@@ -39,12 +39,12 @@ void Arm7TDMI::tick()
     
     if (is_thumb_mode())
     {
-        uint16_t half_word = memory.read<uint16_t>(pc - 4, AccessType::None);
+        uint16_t half_word = memory.read<uint16_t>(pc - 4);
         thumb_execute(half_word);
     }
     else
     {
-        uint32_t word = memory.read<uint32_t>(pc - 8, AccessType::None);
+        uint32_t word = memory.read<uint32_t>(pc - 8);
         arm_execute(word);
     }
 }
@@ -62,8 +62,7 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
         (void)memory.read<uint32_t>(pc, next_pc_fetch); // Really contemplating modeling the pipeline
     }
 
-    if (!is_branched)
-        pc += 4;
+    if (!is_branched) pc += 4;
 }
 
 void Arm7TDMI::thumb_execute(uint16_t opcode)
@@ -73,8 +72,7 @@ void Arm7TDMI::thumb_execute(uint16_t opcode)
     auto next_pc_fetch = (this->*thumb_instr_table[opcode >> 8])(opcode);
     (void)memory.read<uint16_t>(pc, next_pc_fetch); // At this point I might as well model the pipeline
 
-    if (!is_branched)
-        pc += 2;
+    if (!is_branched) pc += 2;
 }
 
 bool Arm7TDMI::check_condition_code(uint32_t code)
@@ -216,7 +214,14 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
 /// @note This might be 1S cycle off.
 void Arm7TDMI::handle_irq()
 {
-    std::cout << "IRQ\n";
+    std::cout << "IRQ, " << std::bitset<16>(interrupt_flag) << '\n';
+
+    for (int i = 0; i < 16; ++i)
+    {
+        if (!Utils::is_bit_set(interrupt_flag, i)) return;
+
+        interrupt_flag = Utils::set_bit(interrupt_flag, i, false);
+    }
 
     spsr_irq = cpsr;
 
@@ -224,7 +229,7 @@ void Arm7TDMI::handle_irq()
     handle_mode_switch(ArmMode::InterruptRequest);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    r14_irq = pc - (is_thumb_mode() ? 2 : 4);
+    get_link() = pc - (is_thumb_mode() ? 2 : 4);
     reload_pipeline32(Arm7VectorAddr::IRQ + 8);
 }
 

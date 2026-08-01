@@ -12,7 +12,8 @@ public:
 
     enum class EventType
     {
-        VBlank,
+        VBlankEnter,
+        VBlankExit,
         HBlank,
         Timer,
         DMA

@@ -10,7 +10,9 @@ Memory::Memory(Scheduler& _scheduler) :
     scheduler(_scheduler),
     game_pak_rom(0x2000000, 0), // 32MB
     game_pak_sram(0x2000000, 0)
-{}
+{
+    write_io16(0x3FF, GBAIO::KEYINPUT);
+}
 
 static const std::array<std::vector<int>, 6> WAITSTATE_CTRL_TABLE 
 {{

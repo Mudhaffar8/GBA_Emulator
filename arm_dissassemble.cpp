@@ -2,7 +2,7 @@
 
 std::string Arm7Dissassembler::arm_branch_dissassemble(uint32_t opcode) 
 { 
-    int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 2;
+    int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 1;
     bool with_link = Utils::is_bit_set(opcode, 24);
 
     std::string instruction = "B";
@@ -94,10 +94,8 @@ std::string Arm7Dissassembler::arm_data_processing_dissassemble(uint32_t opcode)
     instruction += get_condition_code(opcode);
 
     // not TST, TEQ, CMN, or CMP
-    if (operation < 0b1000 || operation > 0b1011)
-        instruction += arm_set_cc(opcode);
+    instruction += (operation < 0b1000 || operation > 0b1011) ? arm_set_cc(opcode) + " " + dst_reg +  ", " : " ";
 
-    instruction += " " + dst_reg +  ", ";
     if (operation != 0b1101) instruction += src_reg + ", ";
     
     if (is_immediate)
@@ -110,7 +108,7 @@ std::string Arm7Dissassembler::arm_data_processing_dissassemble(uint32_t opcode)
     }
     else
     {
-        std::string op2_reg = arm_get_rs(opcode);
+        std::string op2_reg = arm_get_rm(opcode);
         int shift_type = Utils::get_bits(opcode, 5, 7);
         int shift_amount = Utils::get_bits(opcode, 7, 12);
         bool is_register_shift = Utils::is_bit_set(opcode, 4);
@@ -118,8 +116,8 @@ std::string Arm7Dissassembler::arm_data_processing_dissassemble(uint32_t opcode)
         instruction += op2_reg;
         if (shift_amount != 0 || is_register_shift)
         {
-            instruction += + " " + encode_shift_operation(shift_type);
-            instruction += (is_register_shift) ? arm_get_rm(opcode) : "#" + Utils::int_to_hex(shift_amount);
+            instruction += + ", " + encode_shift_operation(shift_type);
+            instruction += (is_register_shift) ? arm_get_rs(opcode) : "#" + Utils::int_to_hex(shift_amount);
         }
     }
 

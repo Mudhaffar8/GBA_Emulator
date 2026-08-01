@@ -31,7 +31,8 @@ int main(int argc, char** argv)
 
     Scheduler scheduler;
     scheduler.add_event(Scheduler::EventType::HBlank, GBATiming::HDRAW);
-    scheduler.add_event(Scheduler::EventType::VBlank, GBATiming::VDRAW);
+    scheduler.add_event(Scheduler::EventType::VBlankEnter, GBATiming::VDRAW);
+    scheduler.add_event(Scheduler::EventType::VBlankExit, GBATiming::REFRESH_RATE);
 
     Memory memory(scheduler);
     
@@ -55,12 +56,10 @@ int main(int argc, char** argv)
         const bool* state = SDL_GetKeyboardState(NULL);
         keypad.handle_inputs(state);
     
-        // Okay so the crash has nothing to do with the CPU at all
-        // It happens later during event handling
         while (!scheduler.next_event_pending()) 
         {
             // Next will be porting this to IMGUI
-            if constexpr (true)
+            if constexpr (false)
             {
                 uint32_t address = cpu.get_pc() - (cpu.is_thumb() ? 4 : 8);
                 std::cout << debugger.disassemble(address, cpu.is_thumb()) << '\n';
@@ -70,21 +69,21 @@ int main(int argc, char** argv)
         
         Scheduler::Event event = scheduler.get_next_event();
         scheduler.pop_event();
-        
 
         int late_cycles = scheduler.get_global_cycles() - event.cycles;
-        // std::cout << "Got Late Cycles! YIPPEE!\n";
-        // Everything above this is perfectly fine
 
-        // This issue is confirmed to be within the switch statement
-        // Based on previous logging, it's likely inside HBLANK
         switch (event.event_type)
         {
-        case Scheduler::EventType::VBlank:
+        case Scheduler::EventType::VBlankEnter:
             display.handle_events();
             display.update_screen(ppu.get_frame_buffer());
             ppu.enter_vblank();
-            scheduler.add_event(Scheduler::EventType::VBlank, GBATiming::REFRESH_RATE - late_cycles);
+            scheduler.add_event(Scheduler::EventType::VBlankEnter, GBATiming::REFRESH_RATE - late_cycles);
+            break;
+    
+        case Scheduler::EventType::VBlankExit:
+            ppu.exit_vblank();
+            scheduler.add_event(Scheduler::EventType::VBlankExit, GBATiming::REFRESH_RATE - late_cycles);
             break;
 
         case Scheduler::EventType::HBlank:
@@ -97,8 +96,6 @@ int main(int argc, char** argv)
         default:
             break;
         }
-
-        // std::cout << "Event Handling Done! YIPPEE!\n";
     }
     #endif
 

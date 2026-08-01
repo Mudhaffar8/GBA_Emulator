@@ -16,8 +16,8 @@ namespace GBAMem
     constexpr uint32_t IO_REGISTERS_END = 0x40003FE;
 
     constexpr uint32_t BG_OBJ_PALETTE_DATA_START = 0x5000000;
-    constexpr uint32_t BG_OBJ_PALETTE_DATA_END = 0x50003FF ;
-
+    constexpr uint32_t BG_OBJ_PALETTE_DATA_END =   0x50003FF;
+  
     constexpr uint32_t VRAM_START = 0x6000000;
     constexpr uint32_t VRAM_END = 0x6017FFF;
 
@@ -135,8 +135,8 @@ namespace GBAIO
     constexpr uint32_t TM3CNT_H = 0x400010E; // Timer 3 Control
 
     /* Keypad Input */
-    constexpr uint32_t KEYINPUT = 0x400010E; // Key Status (R)
-    constexpr uint32_t KEYCNT = 0x4000110; // Key Interrupt Control (R/W)
+    constexpr uint32_t KEYINPUT = 0x4000130; // Key Status (R)
+    constexpr uint32_t KEYCNT = 0x4000132; // Key Interrupt Control (R/W)
 
     /* Interrupt, Waitstate, and Power-Down Control */
     constexpr uint32_t IE = 0x4000200; // Interrupt Enable (R/W)

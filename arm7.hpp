@@ -149,7 +149,7 @@ private:
     inline bool is_privileged_mode() const { return get_curr_mode() != ArmMode::User; }
     inline bool mode_has_spsr() const { return get_curr_mode() != ArmMode::User && get_curr_mode() != ArmMode::System; }
 
-    inline bool is_irq_enabled() const { return !(cpsr & ProgramStatusRegsiter::I); }
+    inline bool is_irq_enabled() const { return (cpsr & ProgramStatusRegsiter::I) == 0; }
 
     /* Instruction Table Dispatch */
     /// @todo Make these into static arrays
