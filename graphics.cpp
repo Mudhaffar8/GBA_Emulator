@@ -44,6 +44,16 @@ Graphics::Graphics(Memory& _memory) :
     brightness_coefficient(_memory)
 {}
 
+void Graphics::enter_hblank()
+{
+
+}
+
+void Graphics::enter_vblank()
+{
+
+}
+
 void Graphics::render_scanline()
 {
     int graphics_mode = dispcnt & Dispcnt::BgMode;
@@ -60,15 +70,6 @@ void Graphics::render_scanline()
     }
 
     scanline_y = (scanline_y >= 227) ? 0 : scanline_y + 1;
-
-    if (scanline_y >= GBARes::LCD_H)
-    {
-        dispstat |= DispStat::VBlankFlag;
-        if (dispstat & DispStat::VBlankIRQEnable)
-            GBAInterrupts::request_interrupt(memory, Interrupts::Vblank);
-    }
-    else if (scanline_y < GBARes::LCD_H)    
-        dispstat &= ~DispStat::VBlankFlag;
 }
 
 // Standard 16-bit bitmapped (non-paletted) 240x160 mode.
@@ -102,6 +103,7 @@ void Graphics::render_scanline_mode4(int screen_y)
     {
         int coords = x + height;
 
+        // Okay this prolly the bug lol
         uint16_t palette_indices = memory.read_vram16(bitmap_start_addr + coords);
         uint8_t palette_index1 = palette_indices >> 8;
         uint8_t palette_index2 = palette_indices & 0xFF;

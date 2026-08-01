@@ -88,7 +88,10 @@ public:
         T = (1 << 5), // State bit
         Mode = 0x1F  // Mode bit
     };
- 
+
+    inline uint32_t get_pc() const { return pc; }
+    inline bool is_thumb() { return is_thumb_mode(); }
+
 private:
     using NextPCFetch = AccessType;
 
@@ -140,13 +143,13 @@ private:
     inline uint32_t& get_sp() { return *registers[13]; }
     inline uint32_t& get_link() { return *registers[14]; }
 
-    inline uint32_t get_curr_mode() { return cpsr & ProgramStatusRegsiter::Mode; }
-    inline bool is_thumb_mode() { return cpsr & ProgramStatusRegsiter::T; }
+    inline uint32_t get_curr_mode() const { return cpsr & ProgramStatusRegsiter::Mode; }
+    inline bool is_thumb_mode() const { return cpsr & ProgramStatusRegsiter::T; }
 
-    inline bool is_privileged_mode() { return get_curr_mode() != ArmMode::User; }
-    inline bool mode_has_spsr() { return get_curr_mode() != ArmMode::User && get_curr_mode() != ArmMode::System; }
+    inline bool is_privileged_mode() const { return get_curr_mode() != ArmMode::User; }
+    inline bool mode_has_spsr() const { return get_curr_mode() != ArmMode::User && get_curr_mode() != ArmMode::System; }
 
-    inline bool is_irq_enabled() { return !(cpsr & ProgramStatusRegsiter::I); }
+    inline bool is_irq_enabled() const { return !(cpsr & ProgramStatusRegsiter::I); }
 
     /* Instruction Table Dispatch */
     /// @todo Make these into static arrays
@@ -169,10 +172,10 @@ private:
         set_cpsr(ProgramStatusRegsiter::N, num & Utils::MSB32);
         set_cpsr(ProgramStatusRegsiter::Z, num == 0);
     }
-    inline bool n_set() { return cpsr & ProgramStatusRegsiter::N; }
-    inline bool z_set() { return cpsr & ProgramStatusRegsiter::Z; }
-    inline bool c_set() { return cpsr & ProgramStatusRegsiter::C; }
-    inline bool v_set() { return cpsr & ProgramStatusRegsiter::V; }
+    inline bool n_set() const { return cpsr & ProgramStatusRegsiter::N; }
+    inline bool z_set() const { return cpsr & ProgramStatusRegsiter::Z; }
+    inline bool c_set() const { return cpsr & ProgramStatusRegsiter::C; }
+    inline bool v_set() const { return cpsr & ProgramStatusRegsiter::V; }
 
     /* Math & Logical Operations */
     uint32_t alu_add_cmn(uint32_t op1, uint32_t op2, bool set_cc);

@@ -2,15 +2,15 @@
 
 std::string Arm7Dissassembler::thumb_add_subtract_dissassemble(uint16_t opcode) 
 {
-    auto [dst_register, src_register] = thumb_get_dst_src(opcode);
+    auto [dst_reg, src_reg] = thumb_get_dst_src(opcode);
 
     int rn_or_offset3 = Utils::get_bits(opcode, 6, 9);
     bool is_sub = Utils::is_bit_set(opcode, 9);
     bool is_immediate = Utils::is_bit_set(opcode, 10);
 
     std::string instruction = (is_sub) ? "SUB " : "ADD ";
-    instruction += dst_register + ", ";
-    instruction += src_register + ", ";
+    instruction += dst_reg + ", ";
+    instruction += src_reg + ", ";
 
     instruction += (is_immediate) ? Utils::int_to_hex(rn_or_offset3) : "R" + std::to_string(rn_or_offset3);
 
@@ -31,7 +31,7 @@ std::string Arm7Dissassembler::thumb_add_offset_sp_dissassemble(uint16_t opcode)
 
 std::string Arm7Dissassembler::thumb_alu_operations_dissassemble(uint16_t opcode)
 {
-    auto [dst_register, src_register] = thumb_get_dst_src(opcode);
+    auto [dst_reg, src_reg] = thumb_get_dst_src(opcode);
     int operation = Utils::get_bits(opcode, 6, 10);    
 
     std::string instruction{};
@@ -57,15 +57,16 @@ std::string Arm7Dissassembler::thumb_alu_operations_dissassemble(uint16_t opcode
         default: break;
     }
 
-    instruction += dst_register + ", " + src_register;
+    instruction += dst_reg + ", " + src_reg;
     return instruction;
 }
 
 std::string Arm7Dissassembler::thumb_conditional_branch_dissassemble(uint16_t opcode)
 {
     int32_t signed_offset9 = Utils::sign_extend32(opcode, 0, 7) << 1;
+    uint32_t condition_code = Utils::get_bits(opcode, 8, 11) << 28;
 
-    std::string instruction = "B" + get_condition_code(opcode);
+    std::string instruction = "B" + get_condition_code(condition_code);
     instruction += " " + Utils::int_to_hex(signed_offset9);
 
     return instruction;
@@ -112,15 +113,15 @@ std::string Arm7Dissassembler::thumb_load_address_dissassemble(uint16_t opcode)
 
 std::string Arm7Dissassembler::thumb_load_store_halfword_dissassemble(uint16_t opcode)
 {
-    auto [dst_src_register, base_register] = thumb_get_dst_src(opcode);
+    auto [dst_src_reg, base_reg] = thumb_get_dst_src(opcode);
     
     uint32_t offset6 = Utils::get_bits(opcode, 6, 11) << 1;
 
     bool is_load = Utils::is_bit_set(opcode, 11);
 
     std::string instruction = (is_load) ? "LDRH " : "STRH ";
-    instruction += dst_src_register + ", [";
-    instruction += base_register + ", " + Utils::int_to_hex(offset6) + "]";
+    instruction += dst_src_reg + ", [";
+    instruction += base_reg + ", " + Utils::int_to_hex(offset6) + "]";
 
     return instruction;
 }
@@ -213,8 +214,8 @@ std::string Arm7Dissassembler::thumb_move_shifted_register_dissassemble(uint16_t
     int operation = Utils::get_bits(opcode, 11, 13);
     uint32_t offset5 = Utils::get_bits(opcode, 6, 11);
     
-    std::string instruction = encode_shift_operation(dst_reg, src_reg, operation);
-    instruction += ", " + Utils::int_to_hex(offset5);
+    std::string instruction = encode_shift_operation(operation); // Already comes w/ space
+    instruction += dst_reg + ", " + src_reg + ", " + Utils::int_to_hex(offset5);
 
     return instruction;
 }
@@ -228,14 +229,18 @@ std::string Arm7Dissassembler::thumb_multiple_load_store_dissassemble(uint16_t o
     std::string instruction = (is_load) ? "LDMIA " : "STMIA ";
     instruction += "R" + std::to_string(base_reg_index) + "!, { ";
 
+    bool first_entry = false;
     for (int i = 0; i < 8; ++i)
     {
         if (!Utils::is_bit_set(r_list, i)) continue;
+        
+        if (first_entry) instruction += ", ";
+        instruction += "R" + std::to_string(i);
 
-        instruction += "R" + std::to_string(i) + ", ";
+        first_entry = true;
     }
 
-    instruction += "}";
+    instruction += " }";
 
     return instruction;
 }
@@ -257,19 +262,21 @@ std::string Arm7Dissassembler::thumb_push_pop_registers_dissassemble(uint16_t op
     bool pc_lr_bit = Utils::is_bit_set(opcode, 8);
     bool is_pop = Utils::is_bit_set(opcode, 11);
 
-    std::string instruction = (is_pop) ? "POP " : "PUSH ";
+    std::string instruction = (is_pop) ? "POP { " : "PUSH { ";
 
+    bool first_entry = false;
     for (int i = 0; i < 8; ++i)
     {
         if (!Utils::is_bit_set(r_list, i)) continue;
+        
+        if (first_entry) instruction += ", ";
+        instruction += "R" + std::to_string(i);
 
-        instruction += "R" + std::to_string(i) + ", ";
+        first_entry = true;
     }
 
-    if (pc_lr_bit)
-        instruction += (is_pop) ? "PC " : "LR";
-
-    instruction += "}";
+    if (pc_lr_bit) instruction += (is_pop) ? "PC " : "LR";
+    instruction += " }";
 
     return instruction;
 }

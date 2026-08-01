@@ -67,9 +67,7 @@ namespace Utils
     inline std::string int_to_hex(int num)
     {
         std::stringstream stream;
-
-        if (num < 0x10) stream << "0";
-        stream << std::hex << num;
+        stream << "0x" << std::hex << num;
 
         return stream.str();
     }

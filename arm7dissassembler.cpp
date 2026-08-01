@@ -5,9 +5,28 @@ Arm7Dissassembler::Arm7Dissassembler(Memory& _memory) :
     memory(_memory)
 {}
 
+std::string Arm7Dissassembler::disassemble(uint32_t address, bool is_thumb)
+{
+    std::string instruction = "Address: " + Utils::int_to_hex(address) + ": ";
+
+    if (is_thumb)
+    {
+        uint16_t half_word = memory.read<uint16_t>(address);
+        instruction += (this->*thumb_instr_table[half_word >> 8])(half_word);
+    }
+    else
+    {
+        uint32_t word = memory.read<uint32_t>(address);
+        int index = (Utils::get_bits(word, 20, 28) << 4) | Utils::get_bits(word, 4, 8);
+        instruction += (this->*arm_instr_table[index])(word);
+    }
+    
+    return instruction;
+}
+
 std::string Arm7Dissassembler::get_condition_code(uint32_t opcode)
 {
-    uint32_t code = Utils::get_bits(opcode, 28, 32);
+    int code = Utils::get_bits(opcode, 28, 32);
     switch(code)
     {
         case Arm7TDMI::ConditionCode::EQ: return "EQ";
@@ -25,7 +44,7 @@ std::string Arm7Dissassembler::get_condition_code(uint32_t opcode)
         case Arm7TDMI::ConditionCode::GT: return "GT";
         case Arm7TDMI::ConditionCode::LE: return "LE";
         case Arm7TDMI::ConditionCode::AL: return "";
-        default: throw std::runtime_error("Invalid Condition Code: " + std::to_string(code));
+        default: break;
     }
 
     return "";

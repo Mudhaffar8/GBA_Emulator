@@ -39,6 +39,9 @@ public:
         VCountSetting = 0xFF00, // Basically LYC (0..227)
     };
 
+    void enter_hblank();
+    void enter_vblank();
+
     void render_scanline();
 
     const std::array<uint32_t, GBARes::Resolution>& get_frame_buffer() const { return frame_buffer; }

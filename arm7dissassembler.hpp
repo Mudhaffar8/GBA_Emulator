@@ -1,13 +1,17 @@
 #pragma once
 
 #include "memory.hpp"
+#include "utils.hpp"
 
+#include <cstdint>
 #include <string>
 
 class Arm7Dissassembler
 {
 public:
     Arm7Dissassembler(Memory& memory);
+
+    std::string disassemble(uint32_t address, bool is_thumb);
 
 private:
     using ArmFunc = std::string (Arm7Dissassembler::*)(uint32_t opcode);
@@ -62,7 +66,7 @@ private:
     std::string thumb_unconditional_branch_dissassemble(uint16_t opcode);
     std::string thumb_undefined_dissassemble(uint16_t opcode);
 
-    inline std::pair<std::string, std::string> arm_get_rn_rd_indices(uint32_t opcode)
+    inline std::pair<std::string, std::string> arm_get_rn_rd(uint32_t opcode)
     {
         int dst_reg_index = Utils::get_bits(opcode, 12, 16);
         int src_reg_index = Utils::get_bits(opcode, 16, 20);
@@ -74,7 +78,7 @@ private:
     }
     
     // Bits 0-3
-    inline std::string arm_get_rm_index(uint32_t opcode)
+    inline std::string arm_get_rm(uint32_t opcode)
     {
         int rm_index = Utils::get_bits(opcode, 0, 4);
         std::string rm = "R" + std::to_string(rm_index);
@@ -82,11 +86,17 @@ private:
     }
 
     // Bits 8-11
-    inline std::string arm_get_rs_index(uint32_t opcode)
+    inline std::string arm_get_rs(uint32_t opcode)
     {
         int rs_index = Utils::get_bits(opcode, 8, 12);
         std::string rs = "R" + std::to_string(rs_index);
         return rs;
+    }
+
+    inline std::string arm_set_cc(uint32_t opcode)
+    {
+        bool set_condition_codes = Utils::is_bit_set(opcode, 20);
+        return set_condition_codes ? "S" : "";
     }
 
     /* Thumb Helper Methods */
@@ -108,19 +118,28 @@ private:
         return dst_reg;
     }
 
-    inline std::string encode_shift_operation(std::string op1, std::string op2, int shift_type) const
+    inline std::string encode_shift_operation(int shift_type) const
     {
-        std::string shift_instruction{};
-
         switch(shift_type)
         {
-            case 0: shift_instruction = "LSL ";
-            case 1: shift_instruction = "LSR ";
-            case 2: shift_instruction = "ASR ";
-            case 3: shift_instruction = "ROR ";
+            case 0: return "LSL ";
+            case 1: return "LSR ";
+            case 2: return "ASR ";
+            case 3: return "ROR ";
             default: break;
         }
-        shift_instruction += op1 + ", " + op2;
-        return shift_instruction;
+
+        return "";
+    }
+
+    inline std::string compute_ror(int op, int shift_amount)
+    {
+        uint32_t result = op;
+        uint32_t rotate_amount = Utils::get_bits(shift_amount, 0, 5);
+        uint32_t bits_shifted_out = Utils::get_bits(op, 0, rotate_amount);
+        result >>= rotate_amount;
+        result |= (bits_shifted_out << (32 - rotate_amount));
+
+        return Utils::int_to_hex(result);
     }
 };
