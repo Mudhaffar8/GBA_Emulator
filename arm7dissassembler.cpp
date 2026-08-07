@@ -8,6 +8,8 @@ Arm7Dissassembler::Arm7Dissassembler(Memory& _memory) :
 std::string Arm7Dissassembler::disassemble(uint32_t address, bool is_thumb)
 {
     std::string instruction = "Address " + Utils::int_to_hex(address) + ": ";
+    
+    instruction_address = address;
 
     if (is_thumb)
     {

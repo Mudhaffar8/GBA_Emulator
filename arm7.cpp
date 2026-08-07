@@ -15,9 +15,12 @@ Arm7TDMI::Arm7TDMI(Memory& _memory) :
 {
     // In normal GBAs, the FIQ signal is shortcut to VDD35, ie. the signal is always high, 
     // and there is no way to generate a FIQ by hardware.
-    r13 = r13_abt = r13_fiq = r13_irq = r13_svc = r13_und = 0x03007F00;
+    // I've set them to the correct SP value and it still does not work :sob:
+    r13 = 0x03007F00;
+    r13_irq = 0x03007FA0;
+    r13_svc = 0x03007FE0;
     pc = GBACart::ENTRY_POINT + 8;
-    cpsr |= ProgramStatusRegsiter::F | ArmMode::System;
+    cpsr |= ProgramStatusRegsiter::F | ArmMode::User;
 }
 #else
 Arm7TDMI::Arm7TDMI(TestMemory& _memory) : 
@@ -34,7 +37,10 @@ void Arm7TDMI::tick()
 {
     #ifndef RUN_JSON_TESTS
     if (is_irq_enabled() && (interrupt_enable & interrupt_flag & 0x3FFF) != 0 && (ime & 1))
+    {
         handle_irq();
+        return;
+    }
     #endif
     
     if (is_thumb_mode())
@@ -214,22 +220,16 @@ void Arm7TDMI::branch_and_exchange(uint32_t address)
 /// @note This might be 1S cycle off.
 void Arm7TDMI::handle_irq()
 {
-    std::cout << "IRQ, " << std::bitset<16>(interrupt_flag) << '\n';
-
-    for (int i = 0; i < 16; ++i)
-    {
-        if (!Utils::is_bit_set(interrupt_flag, i)) return;
-
-        interrupt_flag = Utils::set_bit(interrupt_flag, i, false);
-    }
-
+    #ifndef RUN_JSON_TESTS
+    std::cout << "IRQ Triggered! " << std::bitset<16>(interrupt_flag) << '\n';
+    #endif
     spsr_irq = cpsr;
 
     handle_state_switch(ArmState::Arm);
     handle_mode_switch(ArmMode::InterruptRequest);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    get_link() = pc - (is_thumb_mode() ? 2 : 4);
+    r14_irq = pc - (is_thumb_mode() ? 2 : 4);
     reload_pipeline32(Arm7VectorAddr::IRQ + 8);
 }
 

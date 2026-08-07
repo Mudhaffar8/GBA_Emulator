@@ -141,6 +141,8 @@ namespace GBAIO
     /* Interrupt, Waitstate, and Power-Down Control */
     constexpr uint32_t IE = 0x4000200; // Interrupt Enable (R/W)
     constexpr uint32_t IF = 0x4000202; // Interrupt Request Flag / IRQ Acknowledge (R/W)
-    constexpr uint32_t WAITCNT = 0x4000204;
-    constexpr uint32_t IME = 0x4000208;
+    constexpr uint32_t WAITCNT = 0x4000204; // Game Pak Waitstate Control
+    constexpr uint32_t IME = 0x4000208; // Interrupt Master Enable
+    constexpr uint32_t POSTFLG = 0x4000300; // Post Boot Flag (8-bit)
+    constexpr uint32_t HALTCNT = 0x4000301; // Power Down Control (8-bit)
 };

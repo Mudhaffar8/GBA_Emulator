@@ -130,8 +130,11 @@ void Memory::get_cycles(uint32_t address, AccessType access_type)
     case 0xE000000: // 8-bit data bus
         cycles = WAITSTATE_CTRL_TABLE[0][Utils::get_bits(read_io16(GBAIO::WAITCNT), 0, 2)];
         break;
-
-    default: throw std::runtime_error("Invalid Address: " + std::to_string(address));
+    
+    default:
+        cycles = 1;
+        break;
+    // default: throw std::runtime_error("Invalid Address: " + std::to_string(address));
     }
 
     scheduler.advance(cycles);

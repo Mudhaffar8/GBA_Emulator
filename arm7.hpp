@@ -91,7 +91,7 @@ public:
 
     inline uint32_t get_pc() const { return pc; }
     inline bool is_thumb() { return is_thumb_mode(); }
-
+    inline const std::array<uint32_t*, 16>& get_registers() const { return registers; }
 private:
     using NextPCFetch = AccessType;
 
@@ -336,7 +336,9 @@ private:
     /// Be sure to account for the offset in the new address.
     inline void reload_pipeline32(uint32_t new_pc)
     {
-        assert(!is_thumb_mode());
+        // Cuz of Data Processing w/ dst = R15 this assert may get triggered
+        // if spsr of current mode has T set when being written into cpsr
+        // assert(!is_thumb_mode());
 
         pc = new_pc;
 

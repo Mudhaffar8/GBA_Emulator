@@ -27,6 +27,9 @@ private:
     std::array<ArmFunc, 4096> arm_instr_table = generate_arm_dissassembler_table();
     std::array<ThumbFunc, 256> thumb_instr_table = generate_thumb_dissassembler_table();
 
+    // For calculating branch target addresses
+    uint32_t instruction_address = 0;
+
     std::string arm_branch_dissassemble(uint32_t opcode); // Branch, Branch and Link
     std::string arm_branch_and_exchange_dissassemble(uint32_t opcode);
     std::string arm_block_data_transfer_dissassemble(uint32_t opcode);

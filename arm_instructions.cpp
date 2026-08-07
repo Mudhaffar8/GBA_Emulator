@@ -243,6 +243,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
             uint32_t curr_mode = get_curr_mode();
             Utils::log("SPSR", std::bitset<32>(get_mode_spsr(curr_mode)));
             cpsr = get_mode_spsr(curr_mode);
+            handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
         }
         if (operation < AluOps::Tst || operation > AluOps::Cmn)
             reload_pipeline32(pc + 8);
@@ -261,11 +262,6 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
     // This is taking years off my life
     assert(Utils::get_bits(opcode, 25, 28) == 0b100);
-
-    static const std::array<uint32_t*, 16> usr_registers = {
-        &r0, &r1, &r2, &r3, &r4, &r5, &r6, &r7,
-        &r8, &r9, &r10, &r11, &r12, &r13, &r14, &r15
-    };
 
     int base_register_index = Utils::get_bits(opcode, 16, 20);
     uint32_t& base_register = *registers[base_register_index];
@@ -293,23 +289,25 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
     Utils::log("Offset Amount", offset_amount);
 
+    ArmMode old_mode = static_cast<ArmMode>(cpsr & ProgramStatusRegsiter::Mode);
     bool use_usr_bank = load_psr_or_force_usr_mode && (!Utils::is_bit_set(register_list, 15) || !is_load);
-    auto& registers_to_transfer = (use_usr_bank) ? usr_registers : registers;
+    if (use_usr_bank) 
+        handle_mode_switch(ArmMode::User);
 
     if (register_list == 0)
     {
         // Empty Rlist: R15 loaded/stored (ARMv4 only), and Rb=Rb+/-40h (ARMv4-v5).
-        *registers_to_transfer[base_register_index] += offset_amount * 16;
+        *registers[base_register_index] += offset_amount * 16;
 
         if (is_load)
         {
-            pc = (memory.read<uint32_t>(*registers_to_transfer[base_register_index], AccessType::Sequential) + 4);
+            pc = (memory.read<uint32_t>(*registers[base_register_index], AccessType::Sequential) + 4);
 
             return NextPCFetch::Sequential;
         }
         else
         {
-            memory.write<uint32_t>(pc + 4, *registers_to_transfer[base_register_index], AccessType::NonSequential);
+            memory.write<uint32_t>(pc + 4, *registers[base_register_index], AccessType::NonSequential);
 
             return NextPCFetch::NonSequential;
         }
@@ -331,11 +329,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                *registers_to_transfer[index] = memory.read<uint32_t>(address, access_type);
+                *registers[index] = memory.read<uint32_t>(address, access_type);
             }
             else
             {
-                *registers_to_transfer[index] = memory.read<uint32_t>(address, access_type);
+                *registers[index] = memory.read<uint32_t>(address, access_type);
                 address += offset_amount;
             }
 
@@ -362,23 +360,16 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             if (add_offset_before_transfer) 
             { 
                 address += offset_amount;
-                memory.write<uint32_t>(*registers_to_transfer[index], address, access_type);
+                memory.write<uint32_t>(*registers[index], address, access_type);
             }
             else
             {
-                memory.write<uint32_t>(*registers_to_transfer[index], address, access_type);
+                memory.write<uint32_t>(*registers[index], address, access_type);
                 address += offset_amount;
             }
 
             access_type = AccessType::Sequential;
         }       
-    }
-
-    if (load_psr_or_force_usr_mode && Utils::is_bit_set(register_list, 15) && is_load)
-    {
-        // LDM Rn,…,PC on ARMv4 leaves CPSR.T unchanged.
-        cpsr = get_mode_spsr(get_curr_mode());
-        handle_state_switch(cpsr & ProgramStatusRegsiter::Mode);
     }
 
     /*
@@ -397,7 +388,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         {
             if (!Utils::is_bit_set(register_list, base_register_index))
             {
-                *registers_to_transfer[base_register_index] = address;
+                *registers[base_register_index] = address;
                 
                 // Pipeline Flush
                 if (base_register_index == 15)
@@ -406,8 +397,8 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
         }
         else
         {
-            *registers_to_transfer[base_register_index] = address;
-            Utils::log("Final Base Register", *registers_to_transfer[base_register_index]);
+            *registers[base_register_index] = address;
+            Utils::log("Final Base Register", *registers[base_register_index]);
 
             bool base_is_first = true;
             for (int i = 0; i < 16; ++i)
@@ -428,6 +419,16 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
                 reload_pipeline32(pc + 8);
         }
     }
+
+    if (load_psr_or_force_usr_mode && Utils::is_bit_set(register_list, 15) && is_load)
+    {
+        // LDM Rn,…,PC on ARMv4 leaves CPSR.T unchanged.
+        cpsr = get_mode_spsr(get_curr_mode());
+        handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
+    }
+
+    if (use_usr_bank)
+        handle_mode_switch(old_mode);
 
     // STM is unbelievably scuffed
     return (is_load) ? NextPCFetch::Sequential :NextPCFetch::NonSequential;

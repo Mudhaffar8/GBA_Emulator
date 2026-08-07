@@ -45,6 +45,10 @@ public:
     void get_cycles(uint32_t address, AccessType access_type);
     void add_internal_cycles(uint64_t cycles_to_advance = 1);
 
+    // "for gba I do the same, i.e. when the cpus non-halted I advance on idle/seq/nonseq cycles, 
+    // if it is halted I just timeskip to the next event"
+    bool cpu_is_halted = false;
+
     /* Read/Write Operations for I/O Registers */
     /// @note read_io16, read_io32, write_io16, write_io32 all assume little-endian
     /// Who's using big-endian in 2026? Are you running this on a NASA computer?
@@ -93,6 +97,25 @@ public:
         return val;
     }
 
+    uint16_t get_ie()
+    {
+        uint16_t val{};
+        std::memcpy(&val, &io_registers[GBAIO::IE - GBAMem::IO_REGISTERS_START], sizeof(uint16_t));
+        return val;
+    }
+
+    uint16_t get_if()
+    {
+        uint16_t val{};
+        std::memcpy(&val, &io_registers[GBAIO::IF - GBAMem::IO_REGISTERS_START], sizeof(uint16_t));
+        return val;
+    }
+
+    bool interrupt_pending()
+    {
+        return get_ie() & get_if() & 0x3FFF;
+    }
+
 private: 
     Scheduler& scheduler;
     
@@ -115,11 +138,14 @@ template <typename T>
 T Memory::read(uint32_t address, AccessType access_type)
 {
     static_assert(std::is_same<T, uint32_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, uint8_t>::value);
+    address &= 0xFFFFFFF;
 
     if (access_type != AccessType::None)
         get_cycles(address, access_type);
 
     T val{};
+
+    address &= 0xFFFFFFF;
 
     // The memory map is so clean :o
     switch(address & 0xF000000)
@@ -127,20 +153,21 @@ T Memory::read(uint32_t address, AccessType access_type)
     case 0x0000000: 
         Utils::do_bounds_check(address, 0, GBAMem::SYSTEM_ROM_END, "READ BIOS");
         std::memcpy(&val, system_rom.data() + address, sizeof(T)); break;
-    case 0x2000000: 
+    case 0x2000000:                                        
         std::memcpy(&val, external_ram.data() + (address & 0x3FFFF), sizeof(T)); break;
-    case 0x3000000: 
+    case 0x3000000:                                        
         std::memcpy(&val, internal_ram.data() + (address & 0x7FFF), sizeof(T)); break;
     case 0x4000000: 
         Utils::do_bounds_check(address, GBAMem::IO_REGISTERS_START, GBAMem::IO_REGISTERS_END, "READ IO");
-        std::memcpy(&val, io_registers.data() + (address - 0x4000000), sizeof(T)); break;
+        val = read_io<T>(address);
+        break;
     case 0x5000000: 
         std::memcpy(&val, palette_data.data() + (address & 0x3FF), sizeof(T)); break;
     case 0x6000000: 
         std::memcpy(&val, vram.data() + (address & 0x1FFFF), sizeof(T)); break;
     case 0x7000000: 
         Utils::do_bounds_check(address, GBAMem::OAM_START, GBAMem::OAM_END, "READ OAM");
-        std::memcpy(&val, oam_data.data() + (address - 0x7000000), sizeof(T)); break;
+        std::memcpy(&val, oam_data.data() + (address & 0x3FF), sizeof(T)); break;
     
     case 0x8000000: 
     case 0x9000000:     
@@ -155,7 +182,9 @@ T Memory::read(uint32_t address, AccessType access_type)
         std::memcpy(&val, game_pak_sram.data() + (address - 0xE000000), sizeof(T));
         break;
     
-    default: throw std::runtime_error("Invalid Read Address: " + std::to_string(address));
+    default:
+        val = 0;
+    // default: throw std::runtime_error("Invalid Read Address: " + std::to_string(address));
     }
 
     return val;
@@ -169,6 +198,8 @@ void Memory::write(T val, uint32_t address, AccessType access_type)
     if (access_type != AccessType::None)
         get_cycles(address, access_type);
 
+    address &= 0xFFFFFFF;
+
     switch(address & 0xF000000)
     {
     case 0x0000000: 
@@ -179,15 +210,17 @@ void Memory::write(T val, uint32_t address, AccessType access_type)
         std::memcpy(internal_ram.data() + (address & 0x7FFF), &val, sizeof(T)); break;
 
     case 0x4000000: 
+        // The word at 0x04000800 (only!) is mirrored every 0x10000 bytes
+        // from 0x04000000 - 0x04FFFFFF
         Utils::do_bounds_check(address, GBAMem::IO_REGISTERS_START, GBAMem::IO_REGISTERS_END, "WRITE IO");
-        std::memcpy(io_registers.data() + (address - 0x4000000), &val, sizeof(T)); break;
+        write_io(val, address); break;
 
     case 0x5000000: 
         std::memcpy(palette_data.data() + (address & 0x3FF), &val, sizeof(T)); break;
     case 0x6000000: 
         std::memcpy(vram.data() + (address & 0x1FFFF), &val, sizeof(T)); break;
     case 0x7000000: 
-        std::memcpy(oam_data.data() + (address - 0x7000000), &val, sizeof(T)); break;
+        std::memcpy(oam_data.data() + (address & 0x3FF), &val, sizeof(T)); break;
     
     case 0x8000000: 
     case 0x9000000:     
@@ -202,15 +235,14 @@ void Memory::write(T val, uint32_t address, AccessType access_type)
         std::memcpy(game_pak_sram.data() + (address - 0xE000000), &val, sizeof(T));
         break;
     
-    default: throw std::runtime_error("Invalid Write Address: " + std::to_string(address));
+    default:
+        break;
+
+    // default: throw std::runtime_error("Invalid Write Address: " + std::to_string(address));
     }
 }
 
-// When the interrupt signal is sent, the appropriate flag is set in REG_IF. 
-// The program code unsets this flag (by writing a 1 to that bit) in order 
-// to keep track of what interrupts have been handled.
-// 
-// Basically, writing a 1 to a bit in IF clears it.
+// "HALTCNT does nothing on GBA when written from code outside the BIOS"
 /// @note Assumes word reads are word-aligned and halfword reads are halfword-aligned
 template <typename T>
 T Memory::read_io(uint32_t address)
@@ -226,14 +258,47 @@ T Memory::read_io(uint32_t address)
     return val;
 }
 
+// When the interrupt signal is sent, the appropriate flag is set in REG_IF. 
+// The program code unsets this flag (by writing a 1 to that bit) in order 
+// to keep track of what interrupts have been handled.
+// 
+// Basically, writing a 1 to a bit in IF clears it.
 /// @note Assumes word writes are word-aligned and halfword writes are halfword-aligned
+// Potential issue: this implemenation may not work for 16, 32-bit reads/writes that overlap IO registers
 template <typename T>
 void Memory::write_io(T val, uint32_t address)
 {
+    int index = address - GBAMem::IO_REGISTERS_START;
     switch(address)
     {
+    case GBAIO::IF:
+    case GBAIO::IF+1:
+        {
+            std::cout << "Old IF: " << read_io16(GBAIO::IF) << '\n';
+            T interrupt_flag{};
+            std::memcpy(&interrupt_flag, io_registers.data() + index, sizeof(T));
+            interrupt_flag &= ~val;
+            std::memcpy(io_registers.data() + index, &interrupt_flag, sizeof(T));
+            std::cout << "New IF: " << read_io16(GBAIO::IF) << '\n';
+        }
+        break;
+    
+    case GBAIO::IE:
+    case GBAIO::IE+1:
+        {
+            std::cout << "NEW IE: " << +val << '\n';
+            std::memcpy(io_registers.data() + index, &val, sizeof(T));
+        }
+        break;
+    
+    case GBAIO::HALTCNT:
+        cpu_is_halted = true;
+        std::cout << "HALT CNTRL: " << cpu_is_halted << '\n';
+        io_registers.at(index) = (val & 0x80);
+        break;
+        
     default: 
-        std::memcpy(game_pak_sram.data() + (address - 0xE000000), &val, sizeof(T));
+        std::memcpy(io_registers.data() + index, &val, sizeof(T));
         break;
     }
 }

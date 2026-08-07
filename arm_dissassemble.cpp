@@ -2,13 +2,15 @@
 
 std::string Arm7Dissassembler::arm_branch_dissassemble(uint32_t opcode) 
 { 
-    int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 1;
+    int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 2;
     bool with_link = Utils::is_bit_set(opcode, 24);
+
+    uint32_t final_addr = (instruction_address + sign_extended_offset) + 8;
 
     std::string instruction = "B";
     if (with_link) instruction += "L";
     instruction += get_condition_code(opcode) + " #";
-    instruction += Utils::int_to_hex(sign_extended_offset);
+    instruction += Utils::int_to_hex(final_addr);
 
     return instruction; 
 } 
@@ -96,7 +98,7 @@ std::string Arm7Dissassembler::arm_data_processing_dissassemble(uint32_t opcode)
     // not TST, TEQ, CMN, or CMP
     instruction += (operation < 0b1000 || operation > 0b1011) ? arm_set_cc(opcode) + " " + dst_reg +  ", " : " ";
 
-    if (operation != 0b1101) instruction += src_reg + ", ";
+    if (operation != 0b1101 && operation != 0b1111) instruction += src_reg + ", "; // not MOV or MVN
     
     if (is_immediate)
     {
@@ -288,6 +290,7 @@ std::string Arm7Dissassembler::arm_single_data_transfer_dissassemble(uint32_t op
         int shift_amount = Utils::get_bits(opcode, 7, 12);
         int shift_type = Utils::get_bits(opcode, 5, 7);
 
+        if (!add_to_base) instruction += "-";
         instruction += op2_reg + ", " + encode_shift_operation(shift_type);
         instruction += "#" + Utils::int_to_hex(shift_amount);
     }

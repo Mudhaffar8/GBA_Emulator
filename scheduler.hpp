@@ -14,9 +14,8 @@ public:
     {
         VBlankEnter,
         VBlankExit,
-        HBlank,
-        Timer,
-        DMA
+        HBlankEnter,
+        HBlankExit
     };
 
     struct Event 
@@ -28,6 +27,8 @@ public:
         
         bool operator>(const Event& e) const { return cycles > e.cycles; }
     };  
+
+    uint64_t global_cycles = 0;
 
     void add_event(EventType event_type, uint64_t event_cycles);
     void pop_event();
@@ -44,13 +45,10 @@ public:
         global_cycles += cycles;
     }
 
-    uint64_t get_global_cycles() { return global_cycles; }
-
     /* Debugging */
     void print_all();
 
 private:
     // Sticking to a priority queue for now
     std::priority_queue<Event, std::vector<Event>, std::greater<Event>> event_queue{}; 
-    uint64_t global_cycles = 0;
 };

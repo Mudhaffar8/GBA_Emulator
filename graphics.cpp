@@ -50,28 +50,25 @@ void Graphics::enter_hblank()
 }
 
 /*
-The program seems to be stuck in this loop.
-So no page flipping seems to happen.
-Seems to apply to any Tonc program that uses VBlankInterruptWait
-    Address: 0x4cc: STRH R6, [R2, R12]
-    Address: 0x4d0: B #0xffffffe2
-    Address: 0x49c: STRB R5, [R2, #0x301]
-    Address: 0x4a0: STRH R7, [R2, R12]
-    Address: 0x4a4: LDRH R3, [R4, #-0x7]
-    Address: 0x4a8: ANDS R1, R0, R3
-    Address: 0x4ac: EOR R3, R1, R3
-    Address: 0x4b0: BEQ #0xa
+    Okay the issue is certainly with VBlankIntrWait
+    IF is set to 0 even when VBlank occurs so it's stuck
+    also attempts to write to HALTCNT but the behaviour is weird
 */
 void Graphics::enter_vblank()
 {
-    dispstat = Utils::set_bit(dispstat, DispStat::VBlankFlag, true);
+    dispstat |= DispStat::VBlankFlag;
     if (dispstat & DispStat::VBlankIRQEnable)
-        GBAInterrupts::request_interrupt(memory, Interrupts::Vblank);
+    {
+        std::cout << "IF: " << memory.read_io16(GBAIO::IF) << '\n';
+        std::cout << "IE: " << memory.read_io16(GBAIO::IE) << '\n';
+        std::cout << "IME: " << memory.read_io16(GBAIO::IME) << '\n';
+        GBAInterrupts::request_interrupt(memory, Interrupts::VBlank);
+    }
 }
 
 void Graphics::exit_vblank()
 {
-    dispstat = Utils::set_bit(dispstat, DispStat::VBlankFlag, false);
+    dispstat &= ~DispStat::VBlankFlag;
 }
 
 void Graphics::render_scanline()
