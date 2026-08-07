@@ -42,12 +42,20 @@ public:
     void enter_hblank();
     void enter_vblank();
     void exit_vblank();
+    void exit_hblank();
 
     void render_scanline();
 
     const std::array<uint32_t, GBARes::Resolution>& get_frame_buffer() const { return frame_buffer; }
 
 private:
+    struct BGInfo 
+    {
+        uint16_t bg_control;
+        uint16_t x, y;
+        bool enable;
+    };
+
     Memory& memory;
 
     /* IO registers*/
@@ -103,11 +111,12 @@ private:
     Io16<GBAIO::BLDALPHA> alpha_blend_coefficients;
     Io16<GBAIO::BLDY> brightness_coefficient;
 
-    std::array<uint32_t, GBARes::LCD_H * GBARes::LCD_W> frame_buffer;
+    std::array<uint32_t, GBARes::Resolution> frame_buffer;
 
-    void render_scanline_mode3(uint32_t screen_y);
-    void render_scanline_mode4(uint32_t screen_y);
-    // void render_scanline_mode5(int screen_y);
+    void render_scanline_mode0(uint16_t screen_y);
+    void render_scanline_mode3(uint16_t screen_y);
+    void render_scanline_mode4(uint16_t screen_y);
+    void render_scanline_mode5(uint16_t screen_y);
 
-    uint32_t convert_bgr555_to_rgba32(uint16_t bgr);
+    void render_text_bg_scanline(uint16_t screen_y, uint16_t bg_control, uint16_t bg_x, uint16_t bg_y);
 };

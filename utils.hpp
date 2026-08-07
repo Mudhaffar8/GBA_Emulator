@@ -77,10 +77,23 @@ namespace Utils
     {
         if (val < start || val > end)
         {
-            std::string s = "Out of Bounds!" + name + " Value: " + int_to_hex(val) + '\n';
+            std::string s = "Out of Bounds! " + name + " | Value: " + int_to_hex(val) + '\n';
             s += "Range Start: " + int_to_hex(start);
             s += "\nRange End: " + int_to_hex(end);
             throw std::runtime_error(s);
         }
+    }
+
+    inline uint32_t convert_bgr555_to_rgba32(uint16_t bgr)
+    {
+        uint8_t r5 = bgr & 0x1F;
+        uint8_t g5 = (bgr >> 5) & 0x1F;
+        uint8_t b5 = (bgr >> 10) & 0x1F;
+
+        uint8_t r8 = (r5 << 3) | (r5 >> 2);
+        uint8_t g8 = (g5 << 3) | (g5 >> 2);
+        uint8_t b8 = (b5 << 3) | (b5 >> 2);
+
+        return (r8 << 24) | (g8 << 16) | (b8 << 8) | 0xFF;
     }
 };

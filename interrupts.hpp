@@ -25,9 +25,9 @@ namespace GBAInterrupts
     inline void request_interrupt(Memory& mem, Interrupts interrupt) 
     {
         uint16_t if_flag = mem.get_if();
-        std::cout << "IF OLD: " << std::bitset<16>(if_flag) << '\n';
+        // std::cout << "IF OLD: " << std::bitset<16>(if_flag) << '\n';
         mem.write_io16(if_flag | static_cast<uint16_t>(interrupt), GBAIO::IF);
-        std::cout << "IF NEW: " << std::bitset<16>(if_flag) << '\n';
+        // std::cout << "IF NEW: " << std::bitset<16>(if_flag) << '\n';
     }
     inline void unset_interrupt(Memory& mem, Interrupts interrupt) {}
 

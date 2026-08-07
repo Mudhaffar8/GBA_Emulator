@@ -223,6 +223,7 @@ void Arm7TDMI::handle_irq()
     #ifndef RUN_JSON_TESTS
     std::cout << "IRQ Triggered! " << std::bitset<16>(interrupt_flag) << '\n';
     #endif
+    
     spsr_irq = cpsr;
 
     handle_state_switch(ArmState::Arm);

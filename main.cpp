@@ -30,7 +30,7 @@ int main(int argc, char** argv)
 
     Scheduler scheduler;
     scheduler.add_event(Scheduler::EventType::HBlankEnter, GBATiming::HDRAW);
-    //scheduler.add_event(Scheduler::EventType::HBlankExit, GBATiming::SCANLINE);
+    scheduler.add_event(Scheduler::EventType::HBlankExit, GBATiming::SCANLINE);
     scheduler.add_event(Scheduler::EventType::VBlankEnter, GBATiming::VDRAW);
     scheduler.add_event(Scheduler::EventType::VBlankExit, GBATiming::REFRESH_RATE);
 
@@ -51,15 +51,10 @@ int main(int argc, char** argv)
     Keypad keypad(memory);
     Display display;
     
-    bool slowdown = false;
-
     while (display.is_program_running())
     {   
         auto start = std::chrono::steady_clock::now();
 
-        // I think I've found a clue for what could be causing this issue
-        // R6 should contain the constant #1 but is reset after LDMIA R13!, { R4, R5, R6, R7 } 
-        // Lord of course it was with the stack pointers
         if (!memory.cpu_is_halted)
         {
             while (!scheduler.next_event_pending() && !memory.cpu_is_halted) 
@@ -68,18 +63,9 @@ int main(int argc, char** argv)
                 if (debug_mode)
                 {
                     uint32_t address = cpu.get_pc() - (cpu.is_thumb() ? 4 : 8);
-                    std::string instr = debugger.disassemble(address, cpu.is_thumb());
-                    if (address == 0x8) slowdown = true;
-                    if (slowdown) std::cout << instr << '\n';
-                    if (slowdown) SDL_Delay(100);
+                    std::cout << debugger.disassemble(address, cpu.is_thumb()) << '\n';
                 }
                 cpu.tick();
-                if (debug_mode && slowdown) 
-                {
-                    std::cout << +memory.read<uint8_t>(0x04000000-8) << '\n'; 
-                    for (int i = 0; i < 8; ++i)
-                        std::cout << "R" << std::dec << i << ": " << std::hex << *cpu.get_registers()[i] << '\n';
-                }
             }
         }
         else
@@ -121,20 +107,23 @@ int main(int argc, char** argv)
             break;
 
         case Scheduler::EventType::HBlankEnter:
-            // If NOT in VBlank
-            // Handled in render_scanline for now
+            // Only render_scanline if NOT in VBlank
+            // Should handle at call-site but handled in render_scanline for now
             ppu.render_scanline();
             ppu.enter_hblank();
             scheduler.add_event(Scheduler::EventType::HBlankEnter, GBATiming::SCANLINE - late_cycles);
+            break;
+        
+        case Scheduler::EventType::HBlankExit:
+            ppu.exit_hblank();
+            scheduler.add_event(Scheduler::EventType::HBlankExit, GBATiming::SCANLINE - late_cycles);
             break;
         
         default:
             break;
         }
     }
-    std::cout << "IF: " << memory.read_io16(GBAIO::IF) << '\n';
-    std::cout << "IE: " << memory.read_io16(GBAIO::IE) << '\n';
-    std::cout << "IME: " << memory.read_io16(GBAIO::IME) << '\n';
+    std::cout << "Mode " << (memory.read_io16(GBAIO::DISPCNT) & 7) << '\n';
     #endif
 
     return 0;

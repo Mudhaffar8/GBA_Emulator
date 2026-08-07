@@ -45,8 +45,6 @@ public:
     void get_cycles(uint32_t address, AccessType access_type);
     void add_internal_cycles(uint64_t cycles_to_advance = 1);
 
-    // "for gba I do the same, i.e. when the cpus non-halted I advance on idle/seq/nonseq cycles, 
-    // if it is halted I just timeskip to the next event"
     bool cpu_is_halted = false;
 
     /* Read/Write Operations for I/O Registers */
@@ -212,6 +210,7 @@ void Memory::write(T val, uint32_t address, AccessType access_type)
     case 0x4000000: 
         // The word at 0x04000800 (only!) is mirrored every 0x10000 bytes
         // from 0x04000000 - 0x04FFFFFF
+        // OpenLara seems to write to this memory address for some reason
         Utils::do_bounds_check(address, GBAMem::IO_REGISTERS_START, GBAMem::IO_REGISTERS_END, "WRITE IO");
         write_io(val, address); break;
 
@@ -274,26 +273,24 @@ void Memory::write_io(T val, uint32_t address)
     case GBAIO::IF:
     case GBAIO::IF+1:
         {
-            std::cout << "Old IF: " << read_io16(GBAIO::IF) << '\n';
-            T interrupt_flag{};
-            std::memcpy(&interrupt_flag, io_registers.data() + index, sizeof(T));
-            interrupt_flag &= ~val;
-            std::memcpy(io_registers.data() + index, &interrupt_flag, sizeof(T));
-            std::cout << "New IF: " << read_io16(GBAIO::IF) << '\n';
+            //std::cout << "Old IF: " << read_io16(GBAIO::IF) << '\n';
+            uint16_t if_flag = get_if();
+            if_flag &= ~val;
+            write_io16(if_flag, GBAIO::IF);
         }
         break;
     
     case GBAIO::IE:
     case GBAIO::IE+1:
         {
-            std::cout << "NEW IE: " << +val << '\n';
+            //std::cout << "NEW IE: " << +val << '\n';
             std::memcpy(io_registers.data() + index, &val, sizeof(T));
         }
         break;
     
     case GBAIO::HALTCNT:
         cpu_is_halted = true;
-        std::cout << "HALT CNTRL: " << cpu_is_halted << '\n';
+        //std::cout << "HALT CNTRL: " << cpu_is_halted << '\n';
         io_registers.at(index) = (val & 0x80);
         break;
         
