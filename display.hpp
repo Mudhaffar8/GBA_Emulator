@@ -7,7 +7,7 @@
 
 #include <SDL3/SDL.h>
 
-/// @brief SDL3 and IMGUI wrapper class for window and graphics.
+/// @brief SDL3 wrapper class for window and graphics.
 class Display
 {
 public:

@@ -76,8 +76,17 @@ public:
 
     uint16_t read_vram16(uint32_t address)
     {
+        Utils::do_bounds_check(address + GBAMem::VRAM_START, GBAMem::VRAM_START, GBAMem::VRAM_END, "VRAM_FAST16");
         uint16_t val{};
         std::memcpy(&val, &vram[address], sizeof(uint16_t));
+        return val;
+    }
+
+    uint64_t read_vram64(uint32_t address)
+    {
+        Utils::do_bounds_check(address + GBAMem::VRAM_START, GBAMem::VRAM_START, GBAMem::VRAM_END, "VRAM_FAST64");
+        uint64_t val{};
+        std::memcpy(&val, &vram[address], sizeof(uint64_t));
         return val;
     }
 
@@ -90,6 +99,7 @@ public:
 
     uint16_t read_palette_data16(uint32_t address)
     {
+        Utils::do_bounds_check(address + GBAMem::BG_OBJ_PALETTE_DATA_START, GBAMem::BG_OBJ_PALETTE_DATA_START, GBAMem::BG_OBJ_PALETTE_DATA_END, "PRAM_FAST16");
         uint16_t val{};
         std::memcpy(&val, &palette_data[address], sizeof(uint16_t));
         return val;

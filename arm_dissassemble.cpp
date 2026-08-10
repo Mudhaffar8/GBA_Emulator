@@ -118,7 +118,7 @@ std::string Arm7Dissassembler::arm_data_processing_dissassemble(uint32_t opcode)
         instruction += op2_reg;
         if (shift_amount != 0 || is_register_shift)
         {
-            instruction += + ", " + encode_shift_operation(shift_type);
+            instruction += ", " + encode_shift_operation(shift_type);
             instruction += (is_register_shift) ? arm_get_rs(opcode) : "#" + Utils::int_to_hex(shift_amount);
         }
     }

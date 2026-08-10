@@ -74,12 +74,11 @@ std::string Arm7Dissassembler::thumb_conditional_branch_dissassemble(uint16_t op
 
 std::string Arm7Dissassembler::thumb_hi_reg_op_branch_exchange_dissassemble(uint16_t opcode)
 {
+    int dst_reg_index = Utils::get_bits(opcode, 0, 3);
+    int src_reg_index = Utils::get_bits(opcode, 3, 6);
+    int operation = Utils::get_bits(opcode, 8, 10);
     bool hi_flag_2 = Utils::is_bit_set(opcode, 6);
     bool hi_flag_1 = Utils::is_bit_set(opcode, 7);
-
-    int operation = Utils::get_bits(opcode, 8, 10);
-    int dst_reg_index = Utils::get_bits(opcode, 12, 16);
-    int src_reg_index = Utils::get_bits(opcode, 16, 20);
 
     std::string dst_reg = "R" + std::to_string(dst_reg_index + (8 * hi_flag_2));
     std::string src_reg = "R" + std::to_string(src_reg_index + (8 * hi_flag_1));

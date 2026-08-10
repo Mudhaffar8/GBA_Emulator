@@ -39,16 +39,21 @@ public:
         VCountSetting = 0xFF00, // Basically LYC (0..227)
     };
 
+    /* Event Handling */
     void enter_hblank();
     void enter_vblank();
-    void exit_vblank();
     void exit_hblank();
+    void exit_vblank();
 
     void render_scanline();
 
     const std::array<uint32_t, GBARes::Resolution>& get_frame_buffer() const { return frame_buffer; }
 
 private:
+    using ScreenCoords = std::pair<int, int>;
+    using TileMapCoords = std::pair<uint16_t, uint16_t>;
+    using TileRow = uint64_t;
+
     struct BGInfo 
     {
         uint16_t bg_control;
@@ -56,9 +61,17 @@ private:
         bool enable;
     };
 
+    struct ScreenEntry
+    {
+        uint16_t tile_index;
+        uint8_t palette_bank; // Only in 16-color mode
+        bool h_flip;
+        bool v_flip;
+    };
+
     Memory& memory;
 
-    /* IO registers*/
+    /* IO registers */
     // LCD Control & Status
     Io16<GBAIO::DISPCNT> dispcnt;
     Io16<GBAIO::DISPSTAT> dispstat;
@@ -66,7 +79,7 @@ private:
     // Scanline Y
     Io16<GBAIO::VCOUNT> scanline_y;
 
-    // BG0-3 Toggle
+    // BG0-3 Control
     Io16<GBAIO::BG0CNT> bg0_control;
     Io16<GBAIO::BG1CNT> bg1_control;
     Io16<GBAIO::BG2CNT> bg2_control;
@@ -111,12 +124,20 @@ private:
     Io16<GBAIO::BLDALPHA> alpha_blend_coefficients;
     Io16<GBAIO::BLDY> brightness_coefficient;
 
-    std::array<uint32_t, GBARes::Resolution> frame_buffer;
+    std::array<uint16_t, GBARes::LCD_W> scanline{};
+    std::array<uint32_t, GBARes::Resolution> frame_buffer{};
 
+    /* Scanline Rendering */
     void render_scanline_mode0(uint16_t screen_y);
     void render_scanline_mode3(uint16_t screen_y);
     void render_scanline_mode4(uint16_t screen_y);
     void render_scanline_mode5(uint16_t screen_y);
 
-    void render_text_bg_scanline(uint16_t screen_y, uint16_t bg_control, uint16_t bg_x, uint16_t bg_y);
+    /* BG Rendering Methods */
+    void render_text_bg_scanline(TileMapCoords bg_coords, uint16_t screen_y, uint16_t bg_control);
+    void render_affine_bg_scanline();
+
+    ScreenEntry get_screen_entry(TileMapCoords coords, uint16_t screen_block_base, uint16_t pitch);
+    TileRow fetch_bg_tile_row(uint16_t tile_map_index, uint16_t tile_map_y, uint16_t base_addr, bool flip_y, bool is_8bpp);
+    void write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint16_t palette_index, bool flip_x, bool is_8bpp);
 };
