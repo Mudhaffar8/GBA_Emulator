@@ -137,7 +137,7 @@ private:
     void render_text_bg_scanline(TileMapCoords bg_coords, uint16_t screen_y, uint16_t bg_control);
     void render_affine_bg_scanline();
 
-    ScreenEntry get_screen_entry(TileMapCoords coords, uint16_t screen_block_base, uint16_t pitch);
-    TileRow fetch_bg_tile_row(uint16_t tile_map_index, uint16_t tile_map_y, uint16_t base_addr, bool flip_y, bool is_8bpp);
+    ScreenEntry get_screen_entry(TileMapCoords coords, uint32_t screen_block_base, uint16_t pitch);
+    TileRow fetch_bg_tile_row(uint32_t base_addr, uint16_t tile_map_index, uint16_t tile_map_y, bool flip_y, bool is_8bpp);
     void write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint16_t palette_index, bool flip_x, bool is_8bpp);
 };

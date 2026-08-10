@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     Graphics ppu(memory);
     Keypad keypad(memory);
     Display display;
-    
+
     while (display.is_program_running())
     {   
         auto start = std::chrono::steady_clock::now();
@@ -124,6 +124,7 @@ int main(int argc, char** argv)
         }
     }
     std::cout << "Mode " << (memory.read_io16(GBAIO::DISPCNT) & 7) << '\n';
+    
     #endif
 
     return 0;

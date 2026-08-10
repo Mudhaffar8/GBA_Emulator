@@ -223,8 +223,8 @@ void Graphics::render_text_bg_scanline(TileMapCoords bg_offset, uint16_t screen_
     // Fetch tile row from char block base addr (need tile_number, char_block_base_addr, flip_y, is_8bpp)
     // Write pixels to scanline buffer (need tile_pixels, flip_x, screen_y, palette_number)
 
-    uint16_t screenblock_base_addr = GBAVRam::SCREENBLOCK_SIZE * screen_block_index;
-    uint16_t charblock_base_addr = GBAVRam::CHARBLOCK_SIZE * char_block_index;
+    uint32_t screenblock_base_addr = GBAVRam::SCREENBLOCK_SIZE * screen_block_index;
+    uint32_t charblock_base_addr = GBAVRam::CHARBLOCK_SIZE * char_block_index;
 
     int tile_offset_x = bg_offset.first % 8;
 
@@ -234,17 +234,17 @@ void Graphics::render_text_bg_scanline(TileMapCoords bg_offset, uint16_t screen_
         int tile_map_x = (screen_x + bg_offset.first) & scroll_max_x;
 
         ScreenEntry se = get_screen_entry({tile_map_x, tile_map_y}, screenblock_base_addr, (double_w_tilemap ? 64 : 32));
-        TileRow tile_row = fetch_bg_tile_row(se.tile_index, tile_map_y, charblock_base_addr, se.v_flip, is_8bpp);
-        
+        TileRow tile_row = fetch_bg_tile_row(charblock_base_addr, se.tile_index, tile_map_y, se.v_flip, is_8bpp);
+    
         int last_tile_screen_x = screen_x - tile_offset_x;
         write_tile_row({last_tile_screen_x, screen_y}, tile_row, se.palette_bank, se.h_flip, is_8bpp);
     }
 }
 
-Graphics::ScreenEntry Graphics::get_screen_entry(TileMapCoords tile_map_coords, uint16_t base_addr, uint16_t pitch)
+Graphics::ScreenEntry Graphics::get_screen_entry(TileMapCoords tile_map_coords, uint32_t base_addr, uint16_t pitch)
 {
-    int tile_x = tile_map_coords.first / 32;
-    int tile_y = tile_map_coords.second / 32;
+    int tile_x = tile_map_coords.first / 8;
+    int tile_y = tile_map_coords.second / 8;
     int sbb = (tile_y / 32) * (pitch / 32) + (tile_x / 32);
 
     int screen_entry_index = (sbb * 1024) + (tile_y % 32) * 32 + (tile_x % 32);
@@ -259,13 +259,13 @@ Graphics::ScreenEntry Graphics::get_screen_entry(TileMapCoords tile_map_coords, 
     return screen_entry;
 }
 
-Graphics::TileRow Graphics::fetch_bg_tile_row(uint16_t tile_index, uint16_t tile_map_y, uint16_t base_addr, bool flip_y, bool is_8bpp)
+Graphics::TileRow Graphics::fetch_bg_tile_row(uint32_t base_addr, uint16_t tile_index, uint16_t tile_map_y, bool flip_y, bool is_8bpp)
 {
     int tile_row_index = tile_map_y % 8;
     if (flip_y) tile_row_index = 7 - tile_row_index;
 
     int tile_row_len = (is_8bpp) ? 8 : 4; // in bytes
-    int tile_row_addr = base_addr + (8 * tile_row_len * tile_index) + (tile_row_len * tile_row_index);
+    uint32_t tile_row_addr = base_addr + (8 * tile_row_len * tile_index) + (tile_row_len * tile_row_index);
     TileRow tile_row = static_cast<TileRow>(memory.read_vram64(tile_row_addr));
 
     return tile_row;
@@ -288,8 +288,8 @@ void Graphics::write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint
 
         if (colour_index == 0) continue;
 
-        int colour_index_addr = (is_8bpp) ? (colour_index * 2) : (palette_index * 32) + (colour_index * 2);
-        int palette_color = memory.read_palette_data16(colour_index_addr);
+        uint32_t colour_index_addr = (is_8bpp) ? (colour_index * 2) : (palette_index * 32) + (colour_index * 2);
+        uint16_t palette_color = memory.read_palette_data16(colour_index_addr);
         
         scanline.at(pixel_screen_x) = palette_color;
     }

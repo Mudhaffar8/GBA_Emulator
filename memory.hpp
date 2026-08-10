@@ -76,17 +76,17 @@ public:
 
     uint16_t read_vram16(uint32_t address)
     {
-        Utils::do_bounds_check(address + GBAMem::VRAM_START, GBAMem::VRAM_START, GBAMem::VRAM_END, "VRAM_FAST16");
+        //Utils::do_bounds_check(address + GBAMem::VRAM_START, GBAMem::VRAM_START, GBAMem::VRAM_END, "VRAM_FAST16");
         uint16_t val{};
-        std::memcpy(&val, &vram[address], sizeof(uint16_t));
+        std::memcpy(&val, &vram[address & 0x1FFFF], sizeof(uint16_t));
         return val;
     }
 
     uint64_t read_vram64(uint32_t address)
     {
-        Utils::do_bounds_check(address + GBAMem::VRAM_START, GBAMem::VRAM_START, GBAMem::VRAM_END, "VRAM_FAST64");
+        //Utils::do_bounds_check(address + GBAMem::VRAM_START, GBAMem::VRAM_START, GBAMem::VRAM_END, "VRAM_FAST64");
         uint64_t val{};
-        std::memcpy(&val, &vram[address], sizeof(uint64_t));
+        std::memcpy(&val, &vram[address & 0x1FFFF], sizeof(uint64_t));
         return val;
     }
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "memory_regions.hpp"
-
 namespace GBARes
 {
     constexpr int LCD_W = 240;
@@ -28,8 +26,7 @@ namespace GBATiming
 
 namespace GBAVRam
 {
-    constexpr int SIZE = GBAMem::VRAM_END - GBAMem::VRAM_START + 1;
-    constexpr int CHARBLOCK_SIZE = SIZE / 4;
-    constexpr int SCREENBLOCK_SIZE = CHARBLOCK_SIZE / 8;
+    constexpr int CHARBLOCK_SIZE = 0x40000;
+    constexpr int SCREENBLOCK_SIZE = 0x800;
 }
 
