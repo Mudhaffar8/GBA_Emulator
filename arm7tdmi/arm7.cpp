@@ -4,7 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "memory_regions.hpp"
+#include "../memory_regions.hpp"
 
 #ifndef RUN_JSON_TESTS
 Arm7TDMI::Arm7TDMI(Memory& _memory) : 
@@ -15,11 +15,10 @@ Arm7TDMI::Arm7TDMI(Memory& _memory) :
 {
     // In normal GBAs, the FIQ signal is shortcut to VDD35, ie. the signal is always high, 
     // and there is no way to generate a FIQ by hardware.
-    // I've set them to the correct SP value and it still does not work :sob:
     r13 = 0x03007F00;
     r13_irq = 0x03007FA0;
     r13_svc = 0x03007FE0;
-    pc = GBACart::ENTRY_POINT + 8;
+    r15 = GBACart::ENTRY_POINT + 8;
     cpsr |= ProgramStatusRegsiter::F | ArmMode::User;
 }
 #else
@@ -45,12 +44,12 @@ void Arm7TDMI::tick()
     
     if (is_thumb_mode())
     {
-        uint16_t half_word = memory.read<uint16_t>(pc - 4);
+        uint16_t half_word = memory.read<uint16_t>(r15 - 4);
         thumb_execute(half_word);
     }
     else
     {
-        uint32_t word = memory.read<uint32_t>(pc - 8);
+        uint32_t word = memory.read<uint32_t>(r15 - 8);
         arm_execute(word);
     }
 }
@@ -65,10 +64,10 @@ void Arm7TDMI::arm_execute(uint32_t opcode)
         int index = (Utils::get_bits(opcode, 20, 28) << 4) | Utils::get_bits(opcode, 4, 8);
 
         auto next_pc_fetch = (this->*arm_instr_table[index])(opcode);
-        (void)memory.read<uint32_t>(pc, next_pc_fetch); // Really contemplating modeling the pipeline
+        (void)memory.read<uint32_t>(r15, next_pc_fetch); // Really contemplating modeling the pipeline
     }
 
-    if (!is_branched) pc += 4;
+    if (!is_branched) r15 += 4;
 }
 
 void Arm7TDMI::thumb_execute(uint16_t opcode)
@@ -76,9 +75,9 @@ void Arm7TDMI::thumb_execute(uint16_t opcode)
     is_branched = false;
 
     auto next_pc_fetch = (this->*thumb_instr_table[opcode >> 8])(opcode);
-    (void)memory.read<uint16_t>(pc, next_pc_fetch); // At this point I might as well model the pipeline
+    (void)memory.read<uint16_t>(r15, next_pc_fetch); // At this point I might as well model the pipeline
 
-    if (!is_branched) pc += 2;
+    if (!is_branched) r15 += 2;
 }
 
 bool Arm7TDMI::check_condition_code(uint32_t code)
@@ -230,7 +229,7 @@ void Arm7TDMI::handle_irq()
     handle_mode_switch(ArmMode::InterruptRequest);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    r14_irq = pc - (is_thumb_mode() ? 2 : 4);
+    r14_irq = r15 - (is_thumb_mode() ? 2 : 4);
     reload_pipeline32(Arm7VectorAddr::IRQ + 8);
 }
 

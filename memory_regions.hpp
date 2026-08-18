@@ -19,7 +19,8 @@ namespace GBAMem
     constexpr uint32_t BG_OBJ_PALETTE_DATA_END =   0x50003FF;
   
     constexpr uint32_t VRAM_START = 0x6000000;
-    constexpr uint32_t VRAM_END = 0x6017FFF;
+    constexpr uint32_t VRAM_END = 0x6017FFF;  
+    constexpr uint32_t SPRITE_TILES_START = 0x10000;
 
     constexpr uint32_t OAM_START = 0x7000000;
     constexpr uint32_t OAM_END = 0x70003FF;

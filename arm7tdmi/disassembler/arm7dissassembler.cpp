@@ -1,5 +1,5 @@
 #include "arm7dissassembler.hpp"
-#include "arm7.hpp"
+#include "../arm7.hpp"
 
 Arm7Dissassembler::Arm7Dissassembler(Memory& _memory) :
     memory(_memory)

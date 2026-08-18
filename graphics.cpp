@@ -49,7 +49,7 @@ void Graphics::enter_hblank()
 {
     dispstat |= DispStat::HBlankFlag;
     if (dispstat & DispStat::HBlankIRQEnable)
-        GBAInterrupts::request_interrupt(memory, Interrupts::HBlank);
+        Interrupts::request_interrupt(memory, InterruptType::HBlank);
 }
 
 
@@ -61,7 +61,7 @@ void Graphics::enter_vblank()
         // std::cout << "IF: " << memory.read_io16(GBAIO::IF) << '\n';
         // std::cout << "IE: " << memory.read_io16(GBAIO::IE) << '\n';
         // std::cout << "IME: " << memory.read_io16(GBAIO::IME) << '\n';
-        GBAInterrupts::request_interrupt(memory, Interrupts::VBlank);
+        Interrupts::request_interrupt(memory, InterruptType::VBlank);
     }
 }
 
@@ -122,6 +122,8 @@ void Graphics::render_scanline_mode0(uint16_t screen_y)
             render_text_bg_scanline({bg_info.x, bg_info.y}, screen_y, bg_info.bg_control);
     }
 
+    render_sprites_scanline(screen_y);
+
     for (int i = 0; i < GBARes::LCD_W; ++i)
         frame_buffer.at(i + (screen_y * GBARes::LCD_W)) = Utils::convert_bgr555_to_rgba32(scanline[i]);
 }
@@ -175,23 +177,26 @@ void Graphics::render_scanline_mode5(uint16_t screen_y)
 {
     static const int MODE_5_WIDTH = 160;
     static const int MODE_5_HEIGHT = 128;
-    static const int LEFT = GBARes::LCD_W - MODE_5_WIDTH;
-
-    (void)LEFT; // I might find a use for this
     
     if (screen_y >= GBARes::LCD_H) return;
     if (!(dispcnt & Dispcnt::ScreenEnableBG2)) return;
 
     uint32_t bitmap_start_addr = (dispcnt & Dispcnt::DispFrameSelect) ? 0xA000 : 0;
-    uint32_t height = MODE_5_HEIGHT * screen_y;
+    uint32_t height = GBARes::LCD_W * screen_y;
     
-    for (int x = 0; x < MODE_5_WIDTH; ++x) 
+    int x = 0;
+    if (screen_y < MODE_5_HEIGHT)
     {
-        int coords = (x + height) * 2;
+        for (; x < MODE_5_WIDTH; ++x) 
+        {
+            int coords = (x + height) * 2;
 
-        uint16_t color = memory.read_vram16(bitmap_start_addr + coords);
-        frame_buffer.at(x + height) = Utils::convert_bgr555_to_rgba32(color);
+            uint16_t color = memory.read_vram16(bitmap_start_addr + coords);
+            frame_buffer.at(x + height) = Utils::convert_bgr555_to_rgba32(color);
+        }
     }
+    for (; x < GBARes::LCD_W; ++x)
+        frame_buffer.at(x + height) = Utils::convert_bgr555_to_rgba32(0);
 }
 
 void Graphics::render_text_bg_scanline(TileMapCoords bg_offset, uint16_t screen_y, uint16_t bg_control)
@@ -234,10 +239,10 @@ void Graphics::render_text_bg_scanline(TileMapCoords bg_offset, uint16_t screen_
         int tile_map_x = (screen_x + bg_offset.first) & scroll_max_x;
 
         ScreenEntry se = get_screen_entry({tile_map_x, tile_map_y}, screenblock_base_addr, (double_w_tilemap ? 64 : 32));
-        TileRow tile_row = fetch_bg_tile_row(charblock_base_addr, se.tile_index, tile_map_y, se.v_flip, is_8bpp);
+        TileRow tile_row = fetch_tile_row(charblock_base_addr, se.tile_index, tile_map_y, se.v_flip, is_8bpp);
     
         int last_tile_screen_x = screen_x - tile_offset_x;
-        write_tile_row({last_tile_screen_x, screen_y}, tile_row, se.palette_bank, se.h_flip, is_8bpp);
+        write_tile_row<TileType::BG>({last_tile_screen_x, screen_y}, tile_row, se.palette_bank, se.h_flip, is_8bpp);
     }
 }
 
@@ -259,18 +264,20 @@ Graphics::ScreenEntry Graphics::get_screen_entry(TileMapCoords tile_map_coords, 
     return screen_entry;
 }
 
-Graphics::TileRow Graphics::fetch_bg_tile_row(uint32_t base_addr, uint16_t tile_index, uint16_t tile_map_y, bool flip_y, bool is_8bpp)
+Graphics::TileRow Graphics::fetch_tile_row(uint32_t base_addr, uint16_t tile_index, uint16_t tile_map_y, bool flip_y, bool is_8bpp)
 {
     int tile_row_index = tile_map_y % 8;
     if (flip_y) tile_row_index = 7 - tile_row_index;
 
     int tile_row_len = (is_8bpp) ? 8 : 4; // in bytes
     uint32_t tile_row_addr = base_addr + (8 * tile_row_len * tile_index) + (tile_row_len * tile_row_index);
+
     TileRow tile_row = static_cast<TileRow>(memory.read_vram64(tile_row_addr));
 
     return tile_row;
 }
 
+template <Graphics::TileType T>
 void Graphics::write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint16_t palette_index, bool flip_x, bool is_8bpp)
 {
     if (screen_coords.second >= GBARes::LCD_H) return;
@@ -284,13 +291,111 @@ void Graphics::write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint
 
         int bit_index = (flip_x) ? 7 - i : i;
         int colour_index = (is_8bpp) ? (tile_row >> (bit_index * 8)) & 0xFF : (tile_row >> (bit_index * 4)) & 0xF;
-        if (!is_8bpp) colour_index %= 16;
 
         if (colour_index == 0) continue;
 
         uint32_t colour_index_addr = (is_8bpp) ? (colour_index * 2) : (palette_index * 32) + (colour_index * 2);
+        if constexpr (T == TileType::Sprite) colour_index_addr += 0x200;
+
         uint16_t palette_color = memory.read_palette_data16(colour_index_addr);
         
         scanline.at(pixel_screen_x) = palette_color;
     }
+}
+
+void Graphics::render_sprites_scanline(uint16_t screen_y)
+{
+    for (int i = 0; i < 128; ++i)
+    {
+        /*
+        OAM Write: c0600020 @ address 7000000
+        OAM Write: 1000000 @ address 7000004
+        */
+        Sprite sprite = memory.read_oam64(i * 8);
+
+        if (sprite.obj_mode() == ObjMode::Disabled) continue;
+
+        auto [width, height] = shape_size[sprite.shape()][sprite.size()];
+        if ((sprite.y() + height) < screen_y || sprite.y() > screen_y) continue;
+
+        (sprite.obj_mode() == ObjMode::Normal) ? 
+            render_normal_sprite_scanline(sprite, {width, height}, screen_y) :
+            render_affine_sprite_scanline(sprite, {width, height}, screen_y);
+    }
+}
+
+void Graphics::render_normal_sprite_scanline(Sprite s, Dimensions dimensions, uint16_t screen_y) 
+{
+    uint16_t tile_map_y = screen_y - s.y();
+
+    // std::cout << "Width: " << width << " Height: " << height << '\n';
+
+    // std::cout << "Attributes 0: " << std::hex << s.attributes0 << '\n';
+    // std::cout << "Attributes 1: " << std::hex << s.attributes1 << '\n';
+    // std::cout << "Attributes 2: " << std::hex << s.attributes2 << '\n';
+
+    /*
+        Width: 40 Height: 40
+        Attributes 0: 20
+        Attributes 1: c060
+        Attributes 2: 0
+    */
+    int tile_y = (tile_map_y / 8);
+    for (int tile_i = 0; tile_i < dimensions.first/8; ++tile_i)
+    {
+        uint16_t tile_id = s.tile_id() + tile_i;
+        if (dispcnt & Dispcnt::ObjCharVRAMMapping) tile_id += (tile_y * 8);
+        else tile_id += (tile_y * dimensions.second);
+
+        TileRow tile_row = fetch_tile_row(GBAMem::SPRITE_TILES_START, tile_id, tile_map_y % 8, s.v_flip(), s.is_8bpp()); 
+        write_tile_row<TileType::Sprite>({s.x() + (tile_i * 8), screen_y}, tile_row, s.palette_bank(), s.h_flip(), s.is_8bpp());
+    }
+}
+
+void Graphics::render_affine_sprite_scanline(Sprite sprite, Dimensions dimensions, uint16_t screen_y) 
+{
+    // GBA PPU uses fixed point math for affine transformations (8.8 exactly so 16-bits total)
+    // 1 in 8.8 == 1 << 8
+    // pa = texture x-increment / pixel
+    // pb = texture x-increment / scanline
+    // pc = texture y-increment / pixel
+    // pd = texture y-increment / scanline
+    // It's a good thing I seperated affine and normal (or text) tile rendering
+    // get the bounding box for the transformed sprite 
+    // I prolly need the top-left point of the bounding-box even outside of what gets clipped too
+    // than use inverse mapping by sampling the texels from the og sprite
+    // into the transformed sprite
+
+    // Get pa, pb, pc, pd based on affine index
+    // calculate top-left and bottom-right of bounding box using the above in SCREEN coordinates
+    // calculate clipping area (will be sprite size, x2 if affine double)
+    // Get started from left-most pixel of clipping area of sprite scanline
+    // determine whether a texel would map into screen pixel
+    // if it does, determine which texel
+
+    // Actually nvm I don't actually need the top-left and bottom-right of bounding box
+    // Just start from top-left of clipping area until bottom-right
+    // and use the center point as a reference
+
+    // The Tonc implementation for inverse mapping seems to cause
+    // transformations to be biased towards the left side
+
+    // I could just use matrix multiplication to calculate texel_x and texel_y
+    // but I wanna see if I can do this with just addition
+
+    // Or 0 to 8 (exclusive)?
+    for (double qx = -dimensions.first; qx < dimensions.second; qx++)
+    {
+
+    }
+}
+
+double Graphics::convert_fixed_point_to_double(uint16_t fixed_point)
+{
+    int32_t whole_integer = Utils::sign_extend32(fixed_point >> 8, 0, 7);
+    double whole_number = static_cast<double>(whole_integer);
+    uint32_t fraction_integer = fixed_point & 0xFF;
+    double fraction = static_cast<double>(fraction_integer) / 0x100;
+
+    return whole_number + fraction;
 }

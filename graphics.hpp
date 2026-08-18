@@ -52,7 +52,15 @@ public:
 private:
     using ScreenCoords = std::pair<int, int>;
     using TileMapCoords = std::pair<uint16_t, uint16_t>;
+    using TexelCoords = std::pair<uint8_t, uint8_t>;
+    using Dimensions = std::pair<uint32_t, uint32_t>;
     using TileRow = uint64_t;
+    using Tile = std::array<TileRow, 8>;
+
+    enum class TileType { BG, Sprite };
+
+    enum class ObjMode { Normal, Affine, Disabled, AffineDouble };
+    enum class GfxMode { Normal, AlphaBlending, Window, Forbidden };
 
     struct BGInfo 
     {
@@ -68,6 +76,47 @@ private:
         bool h_flip;
         bool v_flip;
     };
+
+    struct Sprite
+    {
+        uint16_t attributes0{};
+        uint16_t attributes1{};
+        uint16_t attributes2{};
+
+        Sprite(uint64_t op2)
+        {
+            attributes0 = op2 & 0xFFFF;
+            attributes1 = (op2 >> 16) & 0xFFFF;
+            attributes2 = (op2 >> 32) & 0xFFFF;
+        }
+
+        // Attribute 0 Getters
+        int y() { return attributes0 & 0xFF; }
+        ObjMode obj_mode() { return static_cast<ObjMode>(Utils::get_bits(attributes0, 8, 10)); } 
+        GfxMode gfx_mode() { return static_cast<GfxMode>(Utils::get_bits(attributes0, 10, 12)); } 
+        bool mosaic_enabled() { return Utils::is_bit_set(attributes0, 12); } 
+        bool is_8bpp() { return Utils::is_bit_set(attributes0, 13); } 
+        int shape() { return Utils::get_bits(attributes0, 14, 16); } 
+
+        // Attribute 1 Getters
+        int x() { return attributes1 & 0x1FF; }
+        int affine_index() { return Utils::get_bits(attributes1, 9, 14); }
+        bool h_flip() { return Utils::is_bit_set(attributes1, 12); }
+        bool v_flip() { return Utils::is_bit_set(attributes1, 13); }
+        int size() { return Utils::get_bits(attributes1, 14, 16); }
+
+        // Attribute 2 Getters
+        uint16_t tile_id() { return attributes2 & 0x3FF; }
+        uint8_t priority() { return Utils::get_bits(attributes2, 10, 12); }
+        uint8_t palette_bank() { return Utils::get_bits(attributes2, 12, 16); }
+    };
+
+    static constexpr std::array<std::array<std::pair<int, int>, 4>, 3> shape_size
+    {{
+        {{{8, 8}, {16, 16}, {32, 32}, {64, 64}}},
+        {{{16, 8}, {32, 8}, {32, 16}, {64, 32}}},
+        {{{8, 16}, {8, 32}, {16, 32}, {32, 64}}}
+    }};
 
     Memory& memory;
 
@@ -135,9 +184,19 @@ private:
 
     /* BG Rendering Methods */
     void render_text_bg_scanline(TileMapCoords bg_coords, uint16_t screen_y, uint16_t bg_control);
-    void render_affine_bg_scanline();
-
+    void render_affine_bg_scanline(uint16_t screen_y, uint16_t bg_control);
     ScreenEntry get_screen_entry(TileMapCoords coords, uint32_t screen_block_base, uint16_t pitch);
-    TileRow fetch_bg_tile_row(uint32_t base_addr, uint16_t tile_map_index, uint16_t tile_map_y, bool flip_y, bool is_8bpp);
+    
+    TileRow fetch_tile_row(uint32_t base_addr, uint16_t tile_map_index, uint16_t tile_map_y, bool flip_y, bool is_8bpp);
+    template <TileType T>
     void write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint16_t palette_index, bool flip_x, bool is_8bpp);
+
+    /* Sprite Rendering Methods */
+    void render_sprites_scanline(uint16_t screen_y);
+    void render_normal_sprite_scanline(Sprite sprite, Dimensions dimensions, uint16_t screen_y);
+    void render_affine_sprite_scanline(Sprite sprite, Dimensions dimensions, uint16_t screen_y);
+
+    /* Affine-related Methods */
+    double convert_fixed_point_to_double(uint16_t fixed_point);
+    uint8_t get_texel(TexelCoords tile, uint32_t base_addr);
 };

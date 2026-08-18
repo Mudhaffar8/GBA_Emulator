@@ -1,7 +1,7 @@
 #pragma once
 
-#include "memory.hpp"
-#include "utils.hpp"
+#include "../../memory.hpp"
+#include "../../utils.hpp"
 
 #include <cstdint>
 #include <string>

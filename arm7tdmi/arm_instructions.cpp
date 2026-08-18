@@ -31,11 +31,11 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_branch(uint32_t opcode)
     int32_t sign_extended_offset = Utils::sign_extend32(opcode, 0, 23) << 2;
 
     if (Utils::is_bit_set(opcode, 24)) // Branch with Link
-        get_link() = pc - 4;
+        get_link() = r15 - 4;
     
     // The branch offset must take account of the prefetch operation, 
     // which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
-    reload_pipeline32(pc + sign_extended_offset + 8);
+    reload_pipeline32(r15 + sign_extended_offset + 8);
 
     return NextPCFetch::Sequential;
 }
@@ -161,7 +161,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
             shift_amount = arm_get_rs(opcode) & 0xFF;
 
             //  If a register is used to specify the shift amount the PC will be 12 bytes ahead.
-            pc += 4;
+            r15 += 4;
             is_branched = true;
         }
         else 
@@ -246,7 +246,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
             handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
         }
         if (operation < AluOps::Tst || operation > AluOps::Cmn)
-            reload_pipeline32(pc + 8);
+            reload_pipeline32(r15 + 8);
     }
 
     return NextPCFetch::Sequential;
@@ -301,13 +301,13 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
         if (is_load)
         {
-            pc = (memory.read<uint32_t>(*registers[base_register_index], AccessType::Sequential) + 4);
+            r15 = (memory.read<uint32_t>(*registers[base_register_index], AccessType::Sequential) + 4);
 
             return NextPCFetch::Sequential;
         }
         else
         {
-            memory.write<uint32_t>(pc + 4, *registers[base_register_index], AccessType::NonSequential);
+            memory.write<uint32_t>(r15 + 4, *registers[base_register_index], AccessType::NonSequential);
 
             return NextPCFetch::NonSequential;
         }
@@ -338,14 +338,14 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
             }
 
             if (index == 15)
-                reload_pipeline32(pc + 8);
+                reload_pipeline32(r15 + 8);
 
             access_type = AccessType::Sequential;
         }  
     }
     else
     {
-        pc += 4;
+        r15 += 4;
         is_branched = true;
 
         for (int i = 0; i < 16; ++i)
@@ -392,7 +392,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
                 
                 // Pipeline Flush
                 if (base_register_index == 15)
-                    reload_pipeline32(pc + 8);
+                    reload_pipeline32(r15 + 8);
             }
         }
         else
@@ -416,7 +416,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_block_data_transfer(uint32_t opcode)
 
             // Pipeline Flush
             if (base_register_index == 15)
-                reload_pipeline32(pc + 8);
+                reload_pipeline32(r15 + 8);
         }
     }
 
@@ -506,7 +506,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
         {
             if (src_dst_index == 15)
             {
-                pc += 4;
+                r15 += 4;
                 is_branched = true;
             }
 
@@ -543,7 +543,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
         {
             if (src_dst_index == 15)
             {
-                pc += 4;
+                r15 += 4;
                 is_branched = true;
             }
 
@@ -584,7 +584,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
         {
             if (src_dst_index == 15)
             {
-                pc += 4;
+                r15 += 4;
                 is_branched = true;
             }
 
@@ -603,7 +603,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
 
 
     if (src_dst_index == 15 && is_load)
-        reload_pipeline32(pc + 8);
+        reload_pipeline32(r15 + 8);
 
     if (writeback_to_base || !add_before_transfer)
     {   
@@ -613,7 +613,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_halfword_data_transfer(uint32_t opcode)
         if (base_index == 15)
         {
             if (src_dst_index != base_index || !is_load)
-                reload_pipeline32(pc + 12);
+                reload_pipeline32(r15 + 12);
         }
     }
 
@@ -657,7 +657,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_multiply(uint32_t opcode)
 
     Utils::log("Dst Register Old", dst_register);
 
-    pc += 4;
+    r15 += 4;
     is_branched = true;
 
     memory.add_internal_cycles(get_mult_internal_cycles<MultType::MulMla>(op2_register_mult) + accumulate);
@@ -714,7 +714,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_multiply_long(uint32_t opcode)
 
     uint32_t result_lo{}, result_hi{};
 
-    pc += 4;
+    r15 += 4;
     is_branched = true;
 
     if (is_signed)
@@ -750,7 +750,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_multiply_long(uint32_t opcode)
     dst_register_hi = result_hi;
 
     if (dst_hi_index == 15 || dst_lo_index == 15)
-        reload_pipeline32(pc + 8);
+        reload_pipeline32(r15 + 8);
 
     if (set_condition_codes)
     {
@@ -879,7 +879,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_swap(uint32_t opcode)
     Utils::log("Swap Address Value", swap_address);
     Utils::log("Src Register Value", src_register);
 
-    pc += 4;
+    r15 += 4;
     is_branched = true;
 
     uint32_t value{};
@@ -901,7 +901,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_swap(uint32_t opcode)
 
     dst_register = value;
     if (dst_reg_index == 15)
-        reload_pipeline32(pc + 8);
+        reload_pipeline32(r15 + 8);
 
     Utils::log("Final Dst Value", dst_register);
 
@@ -986,7 +986,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             // the store red value will be address of the instruction plus 12.
             if (src_dst_index == 15)
             {
-                pc += 4;
+                r15 += 4;
                 is_branched = true;
             }
 
@@ -1027,7 +1027,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
             // the stored value will be address of the instruction plus 12.
             if (src_dst_index == 15)
             {
-                pc += 4;
+                r15 += 4;
                 is_branched = true;
             }
 
@@ -1045,7 +1045,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
     }
 
     if (src_dst_index == 15 && is_load)
-        reload_pipeline32(pc + 8);
+        reload_pipeline32(r15 + 8);
 
     if (writeback_to_base || !add_before_transfer)
     {   
@@ -1056,7 +1056,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_single_data_transfer(uint32_t opcode)
         {
             // Would this actually lead to 2 pipeline flushes?
             if (src_dst_index != base_index || !is_load)
-                reload_pipeline32(pc + 12);
+                reload_pipeline32(r15 + 12);
 
         }
     }
@@ -1078,7 +1078,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_software_interrupt(uint32_t opcode)
     handle_mode_switch(ArmMode::Supervisor); 
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    get_link() = pc - 4;
+    get_link() = r15 - 4;
     reload_pipeline32(Arm7VectorAddr::SWI + 8); // 1S + 1N
 
     return NextPCFetch::Sequential;
@@ -1102,7 +1102,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_undefined(uint32_t opcode)
 
     memory.add_internal_cycles();
 
-    get_link() = pc - 4;
+    get_link() = r15 - 4;
     reload_pipeline32(Arm7VectorAddr::UNDEFINED + 8); // 1S + 1N
 
     return NextPCFetch::Sequential;

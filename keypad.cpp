@@ -27,19 +27,16 @@ void Keypad::handle_inputs(const bool* state)
         bool keypad_logical_and = Utils::is_bit_set(keypad_control, KeypadInput::ButtonIRQCondition);
         
         if (keypad_logical_and && (keypad_input & keypad_control) == keypad_control)
-            GBAInterrupts::enable_interrupt(memory, Interrupts::Keypad);
+            Interrupts::enable_interrupt(memory, InterruptType::Keypad);
         else if ((keypad_input & keypad_control & 0x3FFF) != 0)
-            GBAInterrupts::enable_interrupt(memory,  Interrupts::Keypad);
+            Interrupts::enable_interrupt(memory,  InterruptType::Keypad);
     }
 }
-
 
 // Note that, rather unconventionally for the Game Boy (Advance),
 // a button being pressed is seen as the corresponding bit 
 // being 0, not 1.
 void Keypad::set_key(KeypadInput input_bit, bool cond)
 {
-    keypad_input = (cond) ? 
-        keypad_input & ~input_bit : 
-        keypad_input | input_bit;
+    keypad_input = (cond) ? keypad_input & ~input_bit : keypad_input | input_bit;
 }

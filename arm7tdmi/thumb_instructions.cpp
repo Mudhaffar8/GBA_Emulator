@@ -200,7 +200,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_conditional_branch(uint16_t opcode)
     int32_t signed_offset9 = Utils::sign_extend32(opcode, 0, 7) << 1;
 
     if (check_condition_code(cond))
-        reload_pipeline16(pc + signed_offset9 + 4); 
+        reload_pipeline16(r15 + signed_offset9 + 4); 
 
     return NextPCFetch::Sequential;
 }
@@ -281,7 +281,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_address(uint16_t opcode)
         // Where the PC is used as the source register (SP = 0), bit 1 of the PC is always read
         // as 0. The value of the PC will be 4 bytes greater than the address of the instruction
         // before bit 1 is forced to 0.
-        dest_register = (pc & ~3) + immediate;
+        dest_register = (r15 & ~3) + immediate;
     }
 
     return NextPCFetch::Sequential;
@@ -483,14 +483,14 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_long_branch_w_link(uint16_t opcode)
 
     if (is_offset_low)
     {
-        uint32_t next_instr_addr = pc - 2;
+        uint32_t next_instr_addr = r15 - 2;
         uint32_t new_addr = (get_link() + (offset << 1) + 4) & ~1;
 
         get_link() = next_instr_addr | 1;
         reload_pipeline16(new_addr);
     }
     else
-        get_link() = pc + (Utils::sign_extend32(offset, 0, 10) << 12);
+        get_link() = r15 + (Utils::sign_extend32(offset, 0, 10) << 12);
 
     return NextPCFetch::Sequential;
 }
@@ -572,9 +572,9 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_multiple_load_store(uint16_t opcode)
     if (r_list == 0)
     {
         if (is_load)
-            pc = (memory.read<uint32_t>(base_register, AccessType::NonSequential) + 2);
+            r15 = (memory.read<uint32_t>(base_register, AccessType::NonSequential) + 2);
         else
-            memory.write<uint32_t>(pc + 2, base_register, AccessType::NonSequential);
+            memory.write<uint32_t>(r15 + 2, base_register, AccessType::NonSequential);
 
         base_register += 64;
 
@@ -648,7 +648,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_pc_relative_load(uint16_t opcode)
     auto& dest_register = thumb_get_dst(opcode);
 
     uint32_t immediate10 = Utils::get_bits(opcode, 0, 8) << 2;
-    uint32_t new_address = (pc + immediate10) & ~3;
+    uint32_t new_address = (r15 + immediate10) & ~3;
 
     memory.add_internal_cycles();
 
@@ -685,7 +685,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_push_pop_registers(uint16_t opcode)
         else
         {
             get_sp() -= 60;
-            thumb_stack_push(pc + 2, AccessType::NonSequential);
+            thumb_stack_push(r15 + 2, AccessType::NonSequential);
 
             return NextPCFetch::NonSequential;
         }
@@ -743,7 +743,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_software_interrupt(uint16_t opcode)
     handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    get_link() = pc - 2;
+    get_link() = r15 - 2;
     reload_pipeline32(Arm7VectorAddr::SWI + 8);
 
     return NextPCFetch::Sequential;
@@ -790,7 +790,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_unconditional_branch(uint16_t opcode)
     assert(Utils::get_bits(opcode, 11, 16) == 0b11100);
     
     int32_t signed_extend12 = Utils::sign_extend32(opcode, 0, 10) << 1;
-    reload_pipeline16(pc + signed_extend12 + 4);
+    reload_pipeline16(r15 + signed_extend12 + 4);
 
     return NextPCFetch::Sequential;
 }
@@ -806,7 +806,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_undefined(uint16_t opcode)
     handle_mode_switch(ArmMode::Supervisor);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    get_link() = pc - 2;
+    get_link() = r15 - 2;
     reload_pipeline32(Arm7VectorAddr::UNDEFINED + 8);
 
     return NextPCFetch::Sequential;

@@ -1,7 +1,7 @@
 #include <iostream>
 
-#include "arm7.hpp"
-#include "arm7dissassembler.hpp"
+#include "arm7tdmi/arm7.hpp"
+#include "arm7tdmi/disassembler/arm7dissassembler.hpp"
 #include "display.hpp"
 #include "graphics_settings.hpp"
 #include "graphics.hpp"

@@ -8,9 +8,9 @@
 #include <stdexcept>
 #include <string>
 
-#include "memory.hpp"
-#include "io_register.hpp"
-#include "utils.hpp"
+#include "../memory.hpp"
+#include "../io_register.hpp"
+#include "../utils.hpp"
 
 namespace Arm7VectorAddr
 {
@@ -89,7 +89,7 @@ public:
         Mode = 0x1F  // Mode bit
     };
 
-    inline uint32_t get_pc() const { return pc; }
+    inline uint32_t get_pc() const { return r15; }
     inline bool is_thumb() { return is_thumb_mode(); }
     inline const std::array<uint32_t*, 16>& get_registers() const { return registers; }
 private:
@@ -130,14 +130,12 @@ private:
         &r8, &r9, &r10, &r11, &r12, &r13, &r14, &r15
     }};
 
-    uint32_t& pc = *registers[15];
-
     // Program Status Registers
     uint32_t cpsr{}, old_cpsr{};
     uint32_t spsr_fiq{}, spsr_svc{}, spsr_abt{}, spsr_irq{}, spsr_und{};
 
     bool is_branched = false;
-    bool skip_mult_instr = false; // Skipping mult cpsr flag on SST
+    bool skip_mult_instr = false; // Skipping mult cpsr flag for SSTs
 
 private:
     inline uint32_t& get_sp() { return *registers[13]; }
@@ -340,10 +338,10 @@ private:
         // if spsr of current mode has T set when being written into cpsr
         // assert(!is_thumb_mode());
 
-        pc = new_pc;
+        r15 = new_pc;
 
-        (void)memory.read<uint32_t>(pc - 8, AccessType::NonSequential);
-        (void)memory.read<uint32_t>(pc - 4, AccessType::Sequential);
+        (void)memory.read<uint32_t>(r15 - 8, AccessType::NonSequential);
+        (void)memory.read<uint32_t>(r15 - 4, AccessType::Sequential);
 
         is_branched = true;
     }
@@ -352,10 +350,10 @@ private:
     {
         assert(is_thumb_mode());
 
-        pc = new_pc;
+        r15 = new_pc;
 
-        (void)memory.read<uint16_t>(pc - 4, AccessType::NonSequential);
-        (void)memory.read<uint16_t>(pc - 2, AccessType::Sequential);
+        (void)memory.read<uint16_t>(r15 - 4, AccessType::NonSequential);
+        (void)memory.read<uint16_t>(r15 - 2, AccessType::Sequential);
        
         is_branched = true;
     }

@@ -7,7 +7,7 @@
 #include <string>
 #include <type_traits>
 
-#include "arm7.hpp"
+#include "arm7tdmi/arm7.hpp"
 #include "utils.hpp"
 #include "memory.hpp"
 
