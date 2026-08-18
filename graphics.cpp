@@ -340,15 +340,30 @@ void Graphics::render_normal_sprite_scanline(Sprite s, Dimensions dimensions, ui
         Attributes 1: c060
         Attributes 2: 0
     */
+    /// @note There may be some bugs with calculating the tile id
     int tile_y = (tile_map_y / 8);
-    for (int tile_i = 0; tile_i < dimensions.first/8; ++tile_i)
+    int tile_row_y = (tile_map_y % 8);
+    for (int tile_x = 0; tile_x < dimensions.first/8; ++tile_x)
     {
-        uint16_t tile_id = s.tile_id() + tile_i;
-        if (dispcnt & Dispcnt::ObjCharVRAMMapping) tile_id += (tile_y * 8);
-        else tile_id += (tile_y * dimensions.second);
+        uint16_t tile_id = s.tile_id();
+        if (dispcnt & Dispcnt::ObjCharVRAMMapping)
+        {
+            if (s.h_flip()) tile_id += ((dimensions.first/8)-1) - tile_x;
+            else tile_id += tile_x;
 
-        TileRow tile_row = fetch_tile_row(GBAMem::SPRITE_TILES_START, tile_id, tile_map_y % 8, s.v_flip(), s.is_8bpp()); 
-        write_tile_row<TileType::Sprite>({s.x() + (tile_i * 8), screen_y}, tile_row, s.palette_bank(), s.h_flip(), s.is_8bpp());
+            if (s.v_flip()) tile_id += (dimensions.second - (tile_y * 8));
+            else tile_id += (tile_y * 8);
+        }
+        else
+        {
+            // This probably needs to be different
+            if (s.h_flip()) tile_id += ((dimensions.first/8)-1) - tile_x;
+            else tile_id += tile_x;
+            tile_id += (tile_y * dimensions.second);
+        }
+
+        TileRow tile_row = fetch_tile_row(GBAMem::SPRITE_TILES_START, tile_id, tile_row_y, s.v_flip(), s.is_8bpp()); 
+        write_tile_row<TileType::Sprite>({s.x() + (tile_x * 8), screen_y}, tile_row, s.palette_bank(), s.h_flip(), s.is_8bpp());
     }
 }
 
