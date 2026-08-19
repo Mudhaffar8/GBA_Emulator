@@ -316,7 +316,10 @@ void Graphics::render_sprites_scanline(uint16_t screen_y)
         if (sprite.obj_mode() == ObjMode::Disabled) continue;
 
         auto [width, height] = shape_size[sprite.shape()][sprite.size()];
-        if ((sprite.y() + height) < screen_y || sprite.y() > screen_y) continue;
+        // if (sprite.y() + height <= static_cast<int>(screen_y) || // Scanline is ahead
+        //     sprite.y() > static_cast<int>(screen_y) || // Sprite is ahead
+        //     (sprite.x() + width) > GBARes::LCD_W 
+        // ) continue;
 
         (sprite.obj_mode() == ObjMode::Normal) ? 
             render_normal_sprite_scanline(sprite, {width, height}, screen_y) :
@@ -328,42 +331,38 @@ void Graphics::render_normal_sprite_scanline(Sprite s, Dimensions dimensions, ui
 {
     uint16_t tile_map_y = screen_y - s.y();
 
-    // std::cout << "Width: " << width << " Height: " << height << '\n';
-
-    // std::cout << "Attributes 0: " << std::hex << s.attributes0 << '\n';
-    // std::cout << "Attributes 1: " << std::hex << s.attributes1 << '\n';
-    // std::cout << "Attributes 2: " << std::hex << s.attributes2 << '\n';
-
-    /*
-        Width: 40 Height: 40
-        Attributes 0: 20
-        Attributes 1: c060
-        Attributes 2: 0
-    */
-    /// @note There may be some bugs with calculating the tile id
     int tile_y = (tile_map_y / 8);
     int tile_row_y = (tile_map_y % 8);
-    for (int tile_x = 0; tile_x < dimensions.first/8; ++tile_x)
+
+    uint32_t width_tiles = (dimensions.first/8);
+    uint32_t height_tiles = (dimensions.first/8);
+    (void)height_tiles;
+
+    // std::cout << "(" << s.x() << ", " << s.y() << ")\n";
+
+    // This is a bit funny looking because i'm iterating over tiles 
+    // in the x-position but iterating over pixel scanlines in 
+    // the y-position
+    for (uint32_t tile_x = 0; tile_x < width_tiles; ++tile_x)
     {
         uint16_t tile_id = s.tile_id();
+        tile_id += s.h_flip() ? (width_tiles - 1) - tile_x : tile_x;
         if (dispcnt & Dispcnt::ObjCharVRAMMapping)
-        {
-            if (s.h_flip()) tile_id += ((dimensions.first/8)-1) - tile_x;
-            else tile_id += tile_x;
-
+        { 
+            // This looks like it should be off by one but works?
             if (s.v_flip()) tile_id += (dimensions.second - (tile_y * 8));
             else tile_id += (tile_y * 8);
         }
         else
         {
-            // This probably needs to be different
-            if (s.h_flip()) tile_id += ((dimensions.first/8)-1) - tile_x;
-            else tile_id += tile_x;
-            tile_id += (tile_y * dimensions.second);
+            if (s.v_flip()) tile_id += 256 - (tile_y * 32);
+            else tile_id += (tile_y * 32);
         }
 
         TileRow tile_row = fetch_tile_row(GBAMem::SPRITE_TILES_START, tile_id, tile_row_y, s.v_flip(), s.is_8bpp()); 
-        write_tile_row<TileType::Sprite>({s.x() + (tile_x * 8), screen_y}, tile_row, s.palette_bank(), s.h_flip(), s.is_8bpp());
+        
+        uint16_t screen_obj_x = (s.x() + (tile_x * 8));
+        write_tile_row<TileType::Sprite>({screen_obj_x, screen_y}, tile_row, s.palette_bank(), s.h_flip(), s.is_8bpp());
     }
 }
 
