@@ -329,39 +329,37 @@ void Graphics::render_sprites_scanline(uint16_t screen_y)
 
 void Graphics::render_normal_sprite_scanline(Sprite s, Dimensions dimensions, uint16_t screen_y) 
 {
-    uint16_t tile_map_y = screen_y - s.y();
+    // Crashes during TONC obj_demo when you change tile_id backwards
+    // likely an index out of bounds thing with the id wrapping around 
+    // causing the target address to be sum like 0x7FFFFFFF (I'm probably a few F's off)
+    uint16_t tile_map_y = (screen_y - s.y()) & 0xFF;
 
     int tile_y = (tile_map_y / 8);
     int tile_row_y = (tile_map_y % 8);
 
     uint32_t width_tiles = (dimensions.first/8);
-    uint32_t height_tiles = (dimensions.first/8);
+    uint32_t height_tiles = (dimensions.second/8);
     (void)height_tiles;
 
-    // std::cout << "(" << s.x() << ", " << s.y() << ")\n";
-
-    // This is a bit funny looking because i'm iterating over tiles 
-    // in the x-position but iterating over pixel scanlines in 
-    // the y-position
     for (uint32_t tile_x = 0; tile_x < width_tiles; ++tile_x)
     {
         uint16_t tile_id = s.tile_id();
         tile_id += s.h_flip() ? (width_tiles - 1) - tile_x : tile_x;
         if (dispcnt & Dispcnt::ObjCharVRAMMapping)
         { 
-            // This looks like it should be off by one but works?
-            if (s.v_flip()) tile_id += (dimensions.second - (tile_y * 8));
-            else tile_id += (tile_y * 8);
+            if (s.v_flip()) tile_id += width_tiles * ((height_tiles - 1) - tile_y);
+            else tile_id += (tile_y * width_tiles);
         }
         else
         {
-            if (s.v_flip()) tile_id += 256 - (tile_y * 32);
+            if (s.v_flip()) tile_id += 224 - (tile_y * 32);
             else tile_id += (tile_y * 32);
         }
 
         TileRow tile_row = fetch_tile_row(GBAMem::SPRITE_TILES_START, tile_id, tile_row_y, s.v_flip(), s.is_8bpp()); 
         
-        uint16_t screen_obj_x = (s.x() + (tile_x * 8));
+        uint32_t tile_pos_x = (s.x() + (tile_x * 8));
+        int screen_obj_x = Utils::sign_extend32(tile_pos_x, 0, 8);
         write_tile_row<TileType::Sprite>({screen_obj_x, screen_y}, tile_row, s.palette_bank(), s.h_flip(), s.is_8bpp());
     }
 }
