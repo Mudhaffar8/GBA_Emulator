@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "io_register.hpp"
 #include "memory.hpp"
 #include "memory_regions.hpp"
@@ -50,10 +52,20 @@ public:
     const std::array<uint32_t, GBARes::Resolution>& get_frame_buffer() const { return frame_buffer; }
 
 private:
-    using ScreenCoords = std::pair<int, int>;
-    using TileMapCoords = std::pair<uint16_t, uint16_t>;
-    using TexelCoords = std::pair<uint8_t, uint8_t>;
-    using Dimensions = std::pair<uint32_t, uint32_t>;
+    template <typename T>
+    struct Coords
+    {
+        T x{}, y{};
+
+        Coords(T _x, T _y) : x(_x), y(_y) {}
+    };
+
+    using ScreenCoords = Coords<int>;
+    using TileMapCoords = Coords<uint16_t>;
+    using TileCoords = Coords<uint32_t>;
+    using TexelCoords = Coords<int>;
+    using Dimensions = Coords<uint32_t>;
+
     using TileRow = uint64_t;
     using Tile = std::array<TileRow, 8>;
 
@@ -196,7 +208,9 @@ private:
     void render_normal_sprite_scanline(Sprite sprite, Dimensions dimensions, uint16_t screen_y);
     void render_affine_sprite_scanline(Sprite sprite, Dimensions dimensions, uint16_t screen_y);
 
+    uint16_t get_tile_id_offset(Sprite sprite, Dimensions size_tiles, TileCoords tile_coords);
+
     /* Affine-related Methods */
     double convert_fixed_point_to_double(uint16_t fixed_point);
-    uint8_t get_texel(TexelCoords tile, uint32_t base_addr);
+    std::optional<uint16_t> get_texel(TexelCoords tile, uint32_t base_addr);
 };

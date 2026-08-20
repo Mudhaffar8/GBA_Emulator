@@ -25,8 +25,8 @@ namespace GBATiming
 };
 
 namespace GBAVRam
-{
-    constexpr int CHARBLOCK_SIZE = 0x40000;
+{                                     
+    constexpr int CHARBLOCK_SIZE = 0x4000;
     constexpr int SCREENBLOCK_SIZE = 0x800;
 }
 
