@@ -2,8 +2,8 @@
 This is a WIP Game Boy Advance Emulator.
 
 # Showcase
-![Mode 3 Tonc](./showcase/mode3_demo.png) ![Mode 4 Tonc](./showcase/keypad_demo2.png) ![Mode 0 Tonc](./showcase/bigmap_demo.png)
-![Mode 3 Panda](./showcase/mode3_panda.png) ![Open Lara](./showcase/openlara2.png) ![Kirby](./showcase/kirby.png)
+![Mode 3 Tonc](./showcase/mode3_demo2.png) ![Mode 4 Tonc](./showcase/keypad_demo2.png) ![Mode 0 Tonc](./showcase/bigmap_demo.png)
+![Mode 3 Panda](./showcase/mode3_panda.png) ![Open Lara](./showcase/openlara2.png) ![Kirby](./showcase/Kirby.png)
 
 ## Current Features
 - A fully-working ARM7TDMI cpu interpreter, passing the [FUZZARM](https://github.com/DenSinH/FuzzARM) rom test and [SingleStepTest's ARM7TDMI Test Suite<sup>1</sup>](https://github.com/SingleStepTests/ARM7TDMI). 
