@@ -41,6 +41,8 @@ Display::Display()
         SDL_Quit();
         throw std::runtime_error("Could not initialize texture");
     }
+
+    SDL_SetWindowSize(window, GBARes::LCD_W * 4, GBARes::LCD_H * 4);
 }
 
 Display::~Display()

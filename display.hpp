@@ -25,7 +25,7 @@ public:
     void update_screen(const std::array<uint32_t, GBARes::Resolution>& frame_buffer);
 
     /* Getters & Setters */
-    inline bool is_program_running() { return is_running; }
+    inline bool& get_running_status() { return is_running; }
 
 private:
     /* SDL resources */

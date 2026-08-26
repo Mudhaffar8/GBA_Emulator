@@ -25,9 +25,10 @@ public:
         ScreenEnableBG1 = (1 << 9),
         ScreenEnableBG2 = (1 << 10),
         ScreenEnableBG3 = (1 << 11),
-        WindowEnableW0 = (1 << 12),
-        WindowEnableW1 = (1 << 13),
-        WindowEnableObj = (1 << 14),
+        SpriteEnable = (1 << 12),
+        WindowEnableW0 = (1 << 13),
+        WindowEnableW1 = (1 << 14),
+        WindowEnableSprite = (1 << 15)
     };
 
     enum DispStat 
@@ -81,6 +82,21 @@ private:
         bool enable;
     };
 
+    struct PixelInfo
+    {
+        int priority{};
+        uint16_t colour{}; 
+
+        PixelInfo() {}
+        PixelInfo(int _priority, uint16_t _colour) : priority(_priority), colour(_colour) {}
+
+        void operator=(PixelInfo colour_info)
+        {
+            priority = colour_info.priority;
+            colour = colour_info.colour;
+        }
+    };
+
     struct ScreenEntry
     {
         uint16_t tile_index;
@@ -119,7 +135,7 @@ private:
 
         // Attribute 2 Getters
         uint16_t tile_id() { return attributes2 & 0x3FF; }
-        uint8_t priority() { return Utils::get_bits(attributes2, 10, 12); }
+        int priority() { return Utils::get_bits(attributes2, 10, 12); }
         uint8_t palette_bank() { return Utils::get_bits(attributes2, 12, 16); }
     };
 

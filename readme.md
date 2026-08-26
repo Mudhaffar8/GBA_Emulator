@@ -2,13 +2,14 @@
 This is a WIP Game Boy Advance Emulator.
 
 # Showcase
-![Mode 3](./showcase/mode3_demo2.png) ![Mode 4 Keypad](./showcase/keypad_demo2.png) ![Mode 0](./showcase/bigmap_demo.png)
+![Mode 3 Tonc](./showcase/mode3_demo.png) ![Mode 4 Tonc](./showcase/keypad_demo2.png) ![Mode 0 Tonc](./showcase/bigmap_demo.png)
+![Mode 3 Panda](./showcase/mode3_panda.png) ![Open Lara](./showcase/openlara2.png) ![Kirby](./showcase/kirby.png)
 
 ## Current Features
 - A fully-working ARM7TDMI cpu interpreter, passing the [FUZZARM](https://github.com/DenSinH/FuzzARM) rom test and [SingleStepTest's ARM7TDMI Test Suite<sup>1</sup>](https://github.com/SingleStepTests/ARM7TDMI). 
 - A decoupled ARM7TDMI disassembler.
 - SDL3 for window and input handling.
-- Basic support for Bit Map Modes 3 and 4.
+- Support for PPU modes 0, 3, and 4.
 
 <i>
     1. With the exception of the result of the carry flag for any MULT Instruction. 
@@ -19,18 +20,18 @@ This is a WIP Game Boy Advance Emulator.
 
 ## Planned Updates
 - Continue working on and completing the PPU:
-    - Adding Modes 0, 1, and 2
-    - Adding the sprite layer and all additional sprite attributes 
+    - Adding Modes 1, and 2
+    - Adding Affine Transformations for sprites
     - Adding post-processing effects (i.e. alpha blending, mosaic)
     - Fixing Mode 5
+- Implement Timers
+- Implement DMA
 - An ImGui-based debugger that allows you to view:
     - CPU GP registers
     - Disassembler showing the program trace
     - Current mode and CPSR
     - Interrupt I/O registers (IE, IF, IME)
     - EWRAM/IWRAM hex dump
-- Implement Timers
-- Implement DMA
 - Make/CMake Compilation
 
 

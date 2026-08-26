@@ -66,8 +66,10 @@ std::string Arm7Dissassembler::thumb_conditional_branch_dissassemble(uint16_t op
     int32_t signed_offset9 = Utils::sign_extend32(opcode, 0, 7) << 1;
     uint32_t condition_code = Utils::get_bits(opcode, 8, 11) << 28;
 
+    uint32_t final_addr = (instruction_address + signed_offset9) + 4;
+
     std::string instruction = "B" + get_condition_code(condition_code);
-    instruction += " " + Utils::int_to_hex(signed_offset9);
+    instruction += " " + Utils::int_to_hex(final_addr);
 
     return instruction;
 }
@@ -80,8 +82,8 @@ std::string Arm7Dissassembler::thumb_hi_reg_op_branch_exchange_dissassemble(uint
     bool hi_flag_2 = Utils::is_bit_set(opcode, 6);
     bool hi_flag_1 = Utils::is_bit_set(opcode, 7);
 
-    std::string dst_reg = "R" + std::to_string(dst_reg_index + (8 * hi_flag_2));
-    std::string src_reg = "R" + std::to_string(src_reg_index + (8 * hi_flag_1));
+    std::string dst_reg = "R" + std::to_string(dst_reg_index + (8 * hi_flag_1));
+    std::string src_reg = "R" + std::to_string(src_reg_index + (8 * hi_flag_2));
 
     std::string instruction{};
 
@@ -311,8 +313,10 @@ std::string Arm7Dissassembler::thumb_unconditional_branch_dissassemble(uint16_t 
 {
     int32_t signed_extend12 = Utils::sign_extend32(opcode, 0, 10) << 1;
 
+    uint32_t final_addr = (instruction_address + signed_extend12) + 4;
+
     std::string instruction = "B ";
-    instruction += Utils::int_to_hex(signed_extend12);
+    instruction += Utils::int_to_hex(final_addr);
 
     return instruction;
 }

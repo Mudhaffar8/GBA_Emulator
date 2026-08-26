@@ -175,10 +175,16 @@ T Memory::read(uint32_t address, AccessType access_type)
     {
     case 0x0000000: 
         Utils::do_bounds_check(address, 0, GBAMem::SYSTEM_ROM_END, "READ BIOS");
-        std::memcpy(&val, system_rom.data() + address, sizeof(T)); break;
+        std::memcpy(&val, system_rom.data() + address, sizeof(T)); 
+        break;
     case 0x2000000: std::memcpy(&val, external_ram.data() + (address & 0x3FFFF), sizeof(T)); break;
     case 0x3000000: std::memcpy(&val, internal_ram.data() + (address & 0x7FFF), sizeof(T)); break;
     case 0x4000000: 
+        if (address == 0x04000800)
+        {
+            std::memcpy(&val, io_registers.data() + (io_registers.size() - 1), sizeof(T));
+            break;
+        }
         Utils::do_bounds_check(address, GBAMem::IO_REGISTERS_START, GBAMem::IO_REGISTERS_END, "READ IO");
         val = read_io<T>(address);
         break;
@@ -219,22 +225,45 @@ void Memory::write(T val, uint32_t address, AccessType access_type)
 
     switch(address & 0xF000000)
     {
-    case 0x0000000: 
-        std::cout << "You can't write to SYSTEM ROM!\n"; break;
-    case 0x2000000: 
-        std::memcpy(external_ram.data() + (address & 0x3FFFF), &val, sizeof(T)); break;
-    case 0x3000000: 
-        std::memcpy(internal_ram.data() + (address & 0x7FFF), &val, sizeof(T)); break;
+    case 0x0000000: std::cout << "You can't write to SYSTEM ROM!\n"; break;
+    case 0x2000000: std::memcpy(external_ram.data() + (address & 0x3FFFF), &val, sizeof(T)); break;
+    case 0x3000000: std::memcpy(internal_ram.data() + (address & 0x7FFF), &val, sizeof(T)); break;
 
     case 0x4000000: 
         // The word at 0x04000800 (only!) is mirrored every 0x10000 bytes
         // from 0x04000000 - 0x04FFFFFF
         // OpenLara seems to write to this memory address for some reason
+        if (address == 0x04000800)
+        {
+            std::memcpy(io_registers.data() + (io_registers.size() - 1), &val, sizeof(T));
+            break;
+        }
         Utils::do_bounds_check(address, GBAMem::IO_REGISTERS_START, GBAMem::IO_REGISTERS_END, "WRITE IO");
         write_io(val, address); break;
 
+    /*
+        Writing 8bit Data to Video Memory
+        Video Memory (BG, OBJ, OAM, Palette) can be written to in 16bit and 32bit units only. 
+        Attempts to write 8bit data (by STRB opcode) won't work:
+        Writes to OBJ (6010000h-6017FFFh) (or 6014000h-6017FFFh in Bitmap mode) and to OAM (7000000h-70003FFh) 
+        are ignored, the memory content remains unchanged.
+        Writes to BG (6000000h-600FFFFh) (or 6000000h-6013FFFh in Bitmap mode) and to Palette (5000000h-50003FFh) 
+        are writing the new 8bit value to BOTH upper and lower 8bits of the addressed halfword, ie. "[addr AND NOT 1]=data*101h"
+    */
     case 0x5000000: std::memcpy(palette_data.data() + (address & 0x3FF), &val, sizeof(T)); break;
-    case 0x6000000: std::memcpy(vram.data() + (address & 0x1FFFF), &val, sizeof(T)); break;
+    case 0x6000000: 
+        if constexpr (!std::is_same<T, uint8_t>::value)
+            std::memcpy(vram.data() + (address & 0x1FFFF), &val, sizeof(T)); 
+        else
+        {
+            // Bitmap Mode
+            if ((read_io16(GBAIO::DISPCNT) & 0x7) > 2)
+            {
+                vram[address & 0x1FFFF] = val;
+                vram[(address & 0x1FFFF) + 1] = val;
+            }
+        }
+        break;
     case 0x7000000: std::memcpy(oam_data.data() + (address & 0x3FF), &val, sizeof(T)); break;
     
     case 0x8000000: 
@@ -309,7 +338,7 @@ void Memory::write_io(T val, uint32_t address)
         //std::cout << "HALT CNTRL: " << cpu_is_halted << '\n';
         io_registers.at(index) = (val & 0x80);
         break;
-        
+
     default: 
         std::memcpy(io_registers.data() + index, &val, sizeof(T));
         break;

@@ -135,7 +135,7 @@ private:
         return "";
     }
 
-    inline std::string compute_ror(int op, int shift_amount)
+    inline std::string compute_ror(uint32_t op, int shift_amount)
     {
         uint32_t result = op;
         uint32_t rotate_amount = Utils::get_bits(shift_amount, 0, 5);

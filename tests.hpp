@@ -228,6 +228,7 @@ public:
 
         if (run_thumb)
         {
+            GBATests::run_test(cpu, memory, "thumb_add_cmp_mov_hi.json");
             GBATests::run_test(cpu, memory, "thumb_add_sp_or_pc.json"); 
             GBATests::run_test(cpu, memory, "thumb_add_sub.json");
             GBATests::run_test(cpu, memory, "thumb_add_sub_sp.json");
@@ -250,6 +251,7 @@ public:
             GBATests::run_test(cpu, memory, "thumb_lsl_lsr_asr.json");
             GBATests::run_test(cpu, memory, "thumb_mov_cmp_add_sub.json");
             GBATests::run_test(cpu, memory, "thumb_push_pop.json");
+            GBATests::run_test(cpu, memory, "thumb_swi.json");
             GBATests::run_test(cpu, memory, "thumb_undefined_bcc.json");
         }
     }

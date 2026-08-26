@@ -106,10 +106,10 @@ void Graphics::render_scanline_mode0(uint16_t screen_y)
 
     
     std::array<BGInfo, 4> mode0_bgs = {{
-        {bg0_control.get(), bg0_x_offset.get(), bg0_y_offset.get(), bg0_enable},
-        {bg1_control.get(), bg1_x_offset.get(), bg1_y_offset.get(), bg1_enable},
+        {bg3_control.get(), bg3_x_offset.get(), bg3_y_offset.get(), bg3_enable},
         {bg2_control.get(), bg2_x_offset.get(), bg2_y_offset.get(), bg2_enable},
-        {bg3_control.get(), bg3_x_offset.get(), bg3_y_offset.get(), bg3_enable}
+        {bg1_control.get(), bg1_x_offset.get(), bg1_y_offset.get(), bg1_enable},
+        {bg0_control.get(), bg0_x_offset.get(), bg0_y_offset.get(), bg0_enable},
     }};
 
     std::stable_sort(mode0_bgs.begin(), mode0_bgs.end(), [](const BGInfo& bg1, const BGInfo& bg2)
@@ -124,7 +124,8 @@ void Graphics::render_scanline_mode0(uint16_t screen_y)
             render_text_bg_scanline({bg_info.x, bg_info.y}, screen_y, bg_info.bg_control);
     }
 
-    render_sprites_scanline(screen_y);
+    if (dispcnt & Dispcnt::SpriteEnable)
+        render_sprites_scanline(screen_y);
 
     for (int i = 0; i < GBARes::LCD_W; ++i)
         frame_buffer.at(i + (screen_y * GBARes::LCD_W)) = Utils::convert_bgr555_to_rgba32(scanline[i]);
@@ -148,8 +149,6 @@ void Graphics::render_scanline_mode3(uint16_t screen_y)
         uint16_t color = memory.read_vram16((x + height) * 2);
         frame_buffer.at(x + height) = Utils::convert_bgr555_to_rgba32(color);
     }
-
-    render_sprites_scanline(screen_y);
 }
 
 void Graphics::render_scanline_mode4(uint16_t screen_y)
@@ -175,7 +174,8 @@ void Graphics::render_scanline_mode4(uint16_t screen_y)
         frame_buffer.at(coords + 1) = Utils::convert_bgr555_to_rgba32(color2);
     }
 
-    render_sprites_scanline(screen_y);
+    if (dispcnt & Dispcnt::SpriteEnable)
+        render_sprites_scanline(screen_y);
 }
 
 /// @note This implementation is buggy and incomplete.
@@ -234,8 +234,6 @@ void Graphics::render_text_bg_scanline(TileMapCoords bg_offset, uint16_t screen_
     // Fetch tile row from char block base addr (need tile_number, char_block_base_addr, flip_y, is_8bpp)
     // Write pixels to scanline buffer (need tile_pixels, flip_x, screen_y, palette_number)
 
-    /// @note Something is wrong with calculating the charblock base address
-    /// that causes an out-of-bounds exception
     uint32_t screenblock_base_addr = GBAVRam::SCREENBLOCK_SIZE * screen_block_index;
     uint32_t charblock_base_addr = GBAVRam::CHARBLOCK_SIZE * char_block_index;
 
@@ -314,7 +312,7 @@ void Graphics::write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint
 void Graphics::render_sprites_scanline(uint16_t screen_y)
 {
     /// @todo This should be done in reverse order
-    for (int i = 0; i < 128; ++i)
+    for (int i = 127; i >= 0; --i)
     {
         /*
         OAM Write: c0600020 @ address 7000000
@@ -325,10 +323,9 @@ void Graphics::render_sprites_scanline(uint16_t screen_y)
         if (sprite.obj_mode() == ObjMode::Disabled) continue;
 
         auto [width, height] = shape_size.at(sprite.shape()).at(sprite.size());
-        // if (sprite.y() + height <= static_cast<int>(screen_y) || // Scanline is ahead
-        //     sprite.y() > static_cast<int>(screen_y) || // Sprite is ahead
-        //     (sprite.x() + width) > GBARes::LCD_W 
-        // ) continue;
+        if (sprite.y() + height <= static_cast<int>(screen_y) ||
+            sprite.y() > static_cast<int>(screen_y)
+        ) continue;
 
         (sprite.obj_mode() == ObjMode::Normal) ? 
             render_normal_sprite_scanline(sprite, {width, height}, screen_y) :
@@ -339,12 +336,13 @@ void Graphics::render_sprites_scanline(uint16_t screen_y)
 void Graphics::render_normal_sprite_scanline(Sprite s, Dimensions dimensions, uint16_t screen_y) 
 {
     int tile_map_y = (screen_y - s.y()) & 0xFF;
-    
+    if (tile_map_y >= GBARes::LCD_H) return;
+
     int tile_y = (tile_map_y / 8);
     int tile_row_y = (tile_map_y % 8);
 
-    uint32_t width_tiles = (dimensions.x/8);
-    uint32_t height_tiles = (dimensions.y/8);
+    uint32_t width_tiles = (dimensions.x / 8);
+    uint32_t height_tiles = (dimensions.y / 8);
 
     for (uint32_t tile_x = 0; tile_x < width_tiles; ++tile_x)
     {
@@ -402,9 +400,9 @@ void Graphics::render_affine_sprite_scanline(Sprite sprite, Dimensions dimension
     uint16_t pd_fixed_point = memory.read_oam16(start_affine_index + 24);
 
     double pa = convert_fixed_point_to_double(pa_fixed_point);
-    double pb = convert_fixed_point_to_double(pa_fixed_point);
-    double pc = convert_fixed_point_to_double(pa_fixed_point);
-    double pd = convert_fixed_point_to_double(pa_fixed_point);
+    double pb = convert_fixed_point_to_double(pb_fixed_point);
+    double pc = convert_fixed_point_to_double(pc_fixed_point);
+    double pd = convert_fixed_point_to_double(pd_fixed_point);
 
     int half_width = (dimensions.x / 2);
     int half_height = (dimensions.y / 2);
@@ -468,7 +466,7 @@ double Graphics::convert_fixed_point_to_double(uint16_t fixed_point)
 
 std::optional<uint16_t> Graphics::get_texel(TexelCoords tile, uint32_t base_addr)
 {
-    return std::make_optional(1);
+    return std::make_optional(8);
 }
 
 uint16_t Graphics::get_tile_id_offset(Sprite sprite, Dimensions size_tiles, TileCoords tile_coords)

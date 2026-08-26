@@ -12,6 +12,12 @@
 #include "tests.hpp"
 #include "utils.hpp"
 
+using DebugTrace = std::vector<std::pair<uint32_t, bool>>;
+using RegisterStates = std::vector<std::array<uint32_t, 16>>;
+
+// Things to look into: passing armwrestler.gba, memory.gba
+// 
+
 int main(int argc, char** argv)
 {
     #ifdef RUN_JSON_TESTS
@@ -19,12 +25,10 @@ int main(int argc, char** argv)
     TestMemory test_memory;
     Arm7TDMI cpu(test_memory);
     
-    GBATests::run_test(cpu, test_memory, "arm_data_proc_immediate_shift.json");
-    GBATests::run_test(cpu, test_memory, "arm_data_proc_immediate.json");
-    GBATests::run_test(cpu, test_memory, "arm_data_proc_register_shift.json");
-    GBATests::run_test(cpu, test_memory, "arm_ldm_stm.json");
-    //GBATests::run_all_tests(cpu, test_memory);
+    GBATests::run_test(cpu, test_memory, "thumb_push_pop.json");
     #else
+
+    constexpr int MAX_LOG_TRACE = 100;
 
     bool debug_mode = std::string(argv[3]) == "t";
 
@@ -46,12 +50,18 @@ int main(int argc, char** argv)
     }
 
     Arm7TDMI cpu(memory);
-    Arm7Dissassembler debugger(memory);
     Graphics ppu(memory);
     Keypad keypad(memory);
     Display display;
 
-    while (display.is_program_running())
+    Arm7Dissassembler debugger(memory);
+    DebugTrace debug_trace{};
+    RegisterStates register_states{};
+
+    register_states.reserve(MAX_LOG_TRACE);
+    debug_trace.reserve(MAX_LOG_TRACE);
+
+    while (display.get_running_status())
     {   
         auto start = std::chrono::steady_clock::now();
 
@@ -59,13 +69,33 @@ int main(int argc, char** argv)
         {
             while (!scheduler.next_event_pending() && !memory.cpu_is_halted) 
             {
+                uint32_t address = cpu.get_pc() - (cpu.is_thumb() ? 4 : 8);                
                 // Next will be porting this to IMGUI
                 if (debug_mode)
                 {
-                    uint32_t address = cpu.get_pc() - (cpu.is_thumb() ? 4 : 8);
-                    std::cout << debugger.disassemble(address, cpu.is_thumb()) << '\n';
-                }
+                    if (debug_trace.size() == debug_trace.capacity())
+                        debug_trace.erase(debug_trace.begin());
+                    
+                    debug_trace.emplace_back(address, cpu.is_thumb());
+                } 
                 cpu.tick();
+                if (debug_mode)
+                {
+                    if (register_states.size() == register_states.capacity())
+                        register_states.erase(register_states.begin());
+                    
+                    std::array<uint32_t, 16> registers{};
+                    for (int i = 0; i < 16; ++i)
+                        registers[i] = *cpu.get_registers()[i];
+
+                    register_states.emplace_back(registers);              
+                }
+
+                if (address == Arm7VectorAddr::RESET)
+                {
+                    display.get_running_status() = false;
+                    break;
+                }
             }
         }
         else
@@ -99,7 +129,7 @@ int main(int argc, char** argv)
                 auto end = std::chrono::steady_clock::now();
                 double diff = std::chrono::duration<double, std::milli>(end - start).count();
 
-                uint32_t time = (diff <= 15) ? (15 - diff) : 0;
+                uint32_t time = (diff < 16.6) ? (16.6 - diff) : 0;
                 SDL_Delay(time);
             }
             ppu.exit_vblank();
@@ -123,8 +153,21 @@ int main(int argc, char** argv)
             break;
         }
     }
-    std::cout << "Mode " << (memory.read_io16(GBAIO::DISPCNT) & 7) << '\n';
-    
+
+    if (debug_mode)
+    {
+        for (int i = 0; i < MAX_LOG_TRACE; ++i)
+        {
+            auto [addr, is_thumb] = debug_trace[i];
+            std::cout << debugger.disassemble(addr, is_thumb) << '\n';
+
+            for (int j = 0; j < 16; ++j)
+                std::cout << "R" << std::dec << j << ": " << Utils::int_to_hex(register_states[i][j]) << '\n';
+
+            std::cout << "-----------------------\n";
+        }
+    }
+
     #endif
 
     return 0;

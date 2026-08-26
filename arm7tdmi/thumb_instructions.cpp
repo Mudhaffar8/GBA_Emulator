@@ -255,6 +255,9 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_hi_reg_op_branch_exchange(uint16_t opcode)
         break;
     }
 
+    if (dst_reg_index == 15 && (operation == 0 || operation == 2))
+        reload_pipeline16((r15 & ~1) + 4);
+
     return NextPCFetch::Sequential;
 }
 
