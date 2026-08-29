@@ -1,7 +1,10 @@
 **/test_roms/
-*.exe
 **/v1/
-json.hpp
 **/.vscode/
+
+json.hpp
+debug_trace.txt
+
+*.exe
 *.dll
-.gba
+*.gba

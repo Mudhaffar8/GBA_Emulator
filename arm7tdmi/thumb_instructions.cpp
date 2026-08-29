@@ -803,10 +803,10 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_undefined(uint16_t opcode)
 {
     Utils::print("THUMB Undefined\n");
 
-    spsr_svc = cpsr;
+    spsr_und = cpsr;
 
     handle_state_switch(ArmState::Arm);
-    handle_mode_switch(ArmMode::Supervisor);
+    handle_mode_switch(ArmMode::Undefined);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
     get_link() = r15 - 2;

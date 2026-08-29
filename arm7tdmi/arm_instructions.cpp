@@ -109,10 +109,10 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
     int operation = Utils::get_bits(opcode, 21, 25);
     Utils::log("Operation", operation);
 
-    bool set_condition_codes = Utils::is_bit_set(opcode, 20);
+    bool set_cc = Utils::is_bit_set(opcode, 20);
     bool is_immediate = Utils::is_bit_set(opcode, 25);
 
-    Utils::log("Set CC", set_condition_codes);
+    Utils::log("Set CC", set_cc);
     Utils::log("Is Immediate", is_immediate);
 
     /*
@@ -139,7 +139,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
         bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
         op2 = (shift_amount == 0) ? 
             imm8 : 
-            alu_ror(imm8, shift_amount * 2, set_condition_codes, !is_arithmetic);
+            alu_ror(imm8, shift_amount * 2, set_cc, !is_arithmetic);
     }
     else 
     {
@@ -171,10 +171,10 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
         Utils::log("Shift", shift_amount % 32);
 
         bool is_arithmetic = operation == AluOps::Sbc || operation == AluOps::Rsc || operation == AluOps::Adc;
-        bool update_carry_flag = set_condition_codes && !is_arithmetic;
+        bool update_carry_flag = set_cc && !is_arithmetic;
 
         op2 = (shift_amount != 0 || !is_register_shift) ?
-            decode_shift_operation_arm(op2_register, shift_amount, shift_type, set_condition_codes, update_carry_flag) :  
+            decode_shift_operation_arm(op2_register, shift_amount, shift_type, set_cc, update_carry_flag) :  
             op2_register;
     }
 
@@ -182,63 +182,29 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
 
     switch(operation)
     {
-    case AluOps::And: // AND
-        dst_register = alu_and_tst(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Eor: // EOR
-        dst_register = alu_eor_teq(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Sub: // SUB
-        dst_register = alu_sub_cmp(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Rsb: // RSB
-        dst_register = alu_sub_cmp(op2, op1_register, set_condition_codes);
-        break;
-    case AluOps::Add: // ADD
-        dst_register = alu_add_cmn(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Adc: // ADC
-        dst_register = alu_adc(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Sbc: // SBC
-        dst_register = alu_sbc(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Rsc: // RSC
-        dst_register = alu_sbc(op2, op1_register, set_condition_codes);
-        break;
-    case AluOps::Tst: // TST
-        (void)alu_and_tst(op1_register, op2, true);
-        break;
-    case AluOps::Teq: // TEQ
-        (void)alu_eor_teq(op1_register, op2, true);
-        break;
-    case AluOps::Cmp: // CMP
-        (void)alu_sub_cmp(op1_register, op2, true);
-        break;
-    case AluOps::Cmn: // CMN
-        (void)alu_add_cmn(op1_register, op2, true);
-        break;
-    case AluOps::Orr: // ORR
-        dst_register = alu_orr(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Mov: // MOV
-        dst_register = alu_mov(op2, set_condition_codes);
-        break;
-    case AluOps::Bic: // BIC
-        dst_register = alu_bic(op1_register, op2, set_condition_codes);
-        break;
-    case AluOps::Mvn: // MVN
-        dst_register = alu_mov(~op2, set_condition_codes);
-        break;
-    default:
-        std::cout << "Invalid Opcode: " << opcode << '\n';
-        break;
+        case AluOps::And: dst_register = alu_and_tst(op1_register, op2, set_cc); break;
+        case AluOps::Eor: dst_register = alu_eor_teq(op1_register, op2, set_cc); break;
+        case AluOps::Sub: dst_register = alu_sub_cmp(op1_register, op2, set_cc); break;
+        case AluOps::Rsb: dst_register = alu_sub_cmp(op2, op1_register, set_cc); break;
+        case AluOps::Add: dst_register = alu_add_cmn(op1_register, op2, set_cc); break;
+        case AluOps::Adc: dst_register = alu_adc(op1_register, op2, set_cc); break;
+        case AluOps::Sbc: dst_register = alu_sbc(op1_register, op2, set_cc); break;
+        case AluOps::Rsc: dst_register = alu_sbc(op2, op1_register, set_cc); break;
+        case AluOps::Tst: (void)alu_and_tst(op1_register, op2, true); break;
+        case AluOps::Teq: (void)alu_eor_teq(op1_register, op2, true); break;
+        case AluOps::Cmp: (void)alu_sub_cmp(op1_register, op2, true); break;
+        case AluOps::Cmn: (void)alu_add_cmn(op1_register, op2, true); break;
+        case AluOps::Orr: dst_register = alu_orr(op1_register, op2, set_cc); break;
+        case AluOps::Mov: dst_register = alu_mov(op2, set_cc); break;
+        case AluOps::Bic: dst_register = alu_bic(op1_register, op2, set_cc); break;
+        case AluOps::Mvn: dst_register = alu_mov(~op2, set_cc); break;
+        default: std::cout << "Invalid Opcode: " << opcode << '\n'; break;
     }
 
     Utils::log("Dst Register", dst_register);
     if (dst_reg_index == 15)
     {
-        if (set_condition_codes)
+        if (set_cc)
         {
             uint32_t curr_mode = get_curr_mode();
             Utils::log("SPSR", std::bitset<32>(get_mode_spsr(curr_mode)));
@@ -246,7 +212,9 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
             handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
         }
         if (operation < AluOps::Tst || operation > AluOps::Cmn)
+        {
             reload_pipeline32(r15 + 8);
+        }
     }
 
     return NextPCFetch::Sequential;

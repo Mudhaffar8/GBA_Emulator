@@ -77,10 +77,10 @@ namespace Utils
     {
         if (val < start || val > end)
         {
-            std::string s = "Out of Bounds! " + name + " | Value: " + int_to_hex(val) + '\n';
-            s += "Range Start: " + int_to_hex(start);
-            s += "\nRange End: " + int_to_hex(end);
-            throw std::runtime_error(s);
+            std::string s = "Out of Bounds! " + name + " | Value: " + Utils::int_to_hex(val) + '\n';
+            s += "Range Start: " + Utils::int_to_hex(start);
+            s += "\nRange End: " + Utils::int_to_hex(end);
+            throw std::runtime_error(name);
         }
     }
 

@@ -288,9 +288,9 @@ std::string Arm7Dissassembler::thumb_push_pop_registers_dissassemble(uint16_t op
 
 std::string Arm7Dissassembler::thumb_software_interrupt_dissassemble(uint16_t opcode)
 {
-    int value8 = Utils::get_bits(opcode, 0, 8);
+    uint32_t value8 = Utils::get_bits(opcode, 0, 8);
 
-    std::string instruction = "SWI " + std::to_string(value8);
+    std::string instruction = "SWI " + decode_bios_function(value8);
     return instruction;
 }
 

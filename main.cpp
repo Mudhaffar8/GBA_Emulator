@@ -12,11 +12,7 @@
 #include "tests.hpp"
 #include "utils.hpp"
 
-using DebugTrace = std::vector<std::pair<uint32_t, bool>>;
-using RegisterStates = std::vector<std::array<uint32_t, 16>>;
-
 // Things to look into: passing armwrestler.gba, memory.gba
-// 
 
 int main(int argc, char** argv)
 {
@@ -28,7 +24,7 @@ int main(int argc, char** argv)
     GBATests::run_test(cpu, test_memory, "thumb_push_pop.json");
     #else
 
-    constexpr int MAX_LOG_TRACE = 100;
+    constexpr int MAX_LOG_TRACE = 50;
 
     bool debug_mode = std::string(argv[3]) == "t";
 
@@ -54,10 +50,12 @@ int main(int argc, char** argv)
     Keypad keypad(memory);
     Display display;
 
-    Arm7Dissassembler debugger(memory);
-    DebugTrace debug_trace{};
-    RegisterStates register_states{};
+    Arm7Dissassembler disassembler(memory);
+    std::vector<std::pair<uint32_t, bool>> debug_trace{};
+    std::vector<std::array<uint32_t, 16>> register_states{};
+    std::vector<uint32_t> cpsr_trace{};
 
+    cpsr_trace.reserve(MAX_LOG_TRACE);
     register_states.reserve(MAX_LOG_TRACE);
     debug_trace.reserve(MAX_LOG_TRACE);
 
@@ -70,6 +68,7 @@ int main(int argc, char** argv)
             while (!scheduler.next_event_pending() && !memory.cpu_is_halted) 
             {
                 uint32_t address = cpu.get_pc() - (cpu.is_thumb() ? 4 : 8);                
+
                 // Next will be porting this to IMGUI
                 if (debug_mode)
                 {
@@ -84,10 +83,14 @@ int main(int argc, char** argv)
                     if (register_states.size() == register_states.capacity())
                         register_states.erase(register_states.begin());
                     
+                    if (cpsr_trace.size() == cpsr_trace.capacity())
+                        cpsr_trace.erase(cpsr_trace.begin());
+                    
                     std::array<uint32_t, 16> registers{};
                     for (int i = 0; i < 16; ++i)
                         registers[i] = *cpu.get_registers()[i];
 
+                    cpsr_trace.emplace_back(cpu.get_cpsr());
                     register_states.emplace_back(registers);              
                 }
 
@@ -129,8 +132,8 @@ int main(int argc, char** argv)
                 auto end = std::chrono::steady_clock::now();
                 double diff = std::chrono::duration<double, std::milli>(end - start).count();
 
-                uint32_t time = (diff < 16.6) ? (16.6 - diff) : 0;
-                SDL_Delay(time);
+                uint32_t time = (diff < 15) ? (15 - diff) : 0;
+                if (!debug_mode) SDL_Delay(time);
             }
             ppu.exit_vblank();
             scheduler.add_event(Scheduler::EventType::VBlankExit, GBATiming::REFRESH_RATE - late_cycles);
@@ -156,16 +159,55 @@ int main(int argc, char** argv)
 
     if (debug_mode)
     {
-        for (int i = 0; i < MAX_LOG_TRACE; ++i)
+        std::ofstream debug_file("./debug_trace.txt");
+        
+        if (debug_file.is_open())
         {
-            auto [addr, is_thumb] = debug_trace[i];
-            std::cout << debugger.disassemble(addr, is_thumb) << '\n';
+            const std::string dash = "======================\n";
 
-            for (int j = 0; j < 16; ++j)
-                std::cout << "R" << std::dec << j << ": " << Utils::int_to_hex(register_states[i][j]) << '\n';
+            for (int i = 0; i < MAX_LOG_TRACE; ++i)
+            {
+                auto [addr, is_thumb] = debug_trace[i];
+                std::string debug = disassembler.disassemble(addr, is_thumb) + '\n';
+                debug_file.write(debug.c_str(), debug.size());
 
-            std::cout << "-----------------------\n";
+                for (int j = 0; j < 16; ++j)
+                {
+                    std::string reg_str = "R" + std::to_string(j) + ": ";
+                    reg_str += Utils::int_to_hex(register_states[i][j]) + '\n';
+
+                    debug_file.write(reg_str.c_str(), reg_str.size());
+                }
+
+                uint32_t cpsr = cpsr_trace[i];
+                
+                std::string cpsr_str{};
+                cpsr_str.push_back((cpsr & Arm7TDMI::ProgramStatusRegsiter::N) ? 'N' : '-');
+                cpsr_str.push_back((cpsr & Arm7TDMI::ProgramStatusRegsiter::Z) ? 'Z' : '-');
+                cpsr_str.push_back((cpsr & Arm7TDMI::ProgramStatusRegsiter::C) ? 'C' : '-');
+                cpsr_str.push_back((cpsr & Arm7TDMI::ProgramStatusRegsiter::V) ? 'V' : '-');
+                cpsr_str.push_back((cpsr & Arm7TDMI::ProgramStatusRegsiter::F) ? 'F' : '-');
+                cpsr_str.push_back((cpsr & Arm7TDMI::ProgramStatusRegsiter::I) ? 'I' : '-');
+                cpsr_str.push_back((cpsr & Arm7TDMI::ProgramStatusRegsiter::T) ? 'T' : '-');
+                cpsr_str += ", Mode: ";
+
+                int cpsr_mode = cpsr & Arm7TDMI::ProgramStatusRegsiter::Mode;
+                switch(cpsr_mode)
+                {
+                    case Arm7TDMI::ArmMode::User: cpsr_str += "User\n"; break;
+                    case Arm7TDMI::ArmMode::FastInterrupt: cpsr_str += "FIQ\n"; break;
+                    case Arm7TDMI::ArmMode::InterruptRequest: cpsr_str += "IRQ\n"; break;
+                    case Arm7TDMI::ArmMode::Supervisor: cpsr_str += "Supervisor\n"; break;
+                    case Arm7TDMI::ArmMode::Abort: cpsr_str += "Abort\n"; break;
+                    case Arm7TDMI::ArmMode::System: cpsr_str += "System\n"; break;
+                    default: cpsr_str += "Uknown Mode (" + std::to_string(cpsr_mode) + ")\n"; break;
+                }
+                debug_file.write(cpsr_str.c_str(), cpsr_str.size());
+                debug_file.write(dash.c_str(), dash.size());
+            }
         }
+
+        debug_file.close();
     }
 
     #endif

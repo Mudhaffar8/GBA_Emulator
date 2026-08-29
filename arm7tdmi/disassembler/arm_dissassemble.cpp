@@ -243,9 +243,9 @@ std::string Arm7Dissassembler::arm_psr_transfer_dissassemble(uint32_t opcode)
 
 std::string Arm7Dissassembler::arm_software_interrupt_dissassemble(uint32_t opcode) 
 { 
-    int value24 = Utils::get_bits(opcode, 0, 24);
+    uint32_t value24 = Utils::get_bits(opcode, 0, 24);
 
-    return "SWI " + std::to_string(value24);
+    return "SWI " + get_condition_code(opcode) + decode_bios_function(value24);
 }
 
 std::string Arm7Dissassembler::arm_single_data_swap_dissassemble(uint32_t opcode) 

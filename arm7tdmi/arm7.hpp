@@ -89,9 +89,12 @@ public:
         Mode = 0x1F  // Mode bit
     };
 
+    /* Getters */
     inline uint32_t get_pc() const { return r15; }
     inline bool is_thumb() { return is_thumb_mode(); }
     inline const std::array<uint32_t*, 16>& get_registers() const { return registers; }
+    inline const uint32_t get_cpsr() const { return cpsr; }
+
 private:
     using NextPCFetch = AccessType;
 

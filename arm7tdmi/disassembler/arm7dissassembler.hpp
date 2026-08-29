@@ -18,6 +18,7 @@ private:
     using ThumbFunc = std::string (Arm7Dissassembler::*)(uint16_t opcode);
 
     std::string get_condition_code(uint32_t code);
+    std::string decode_bios_function(uint32_t value);
 
     Memory& memory;
 

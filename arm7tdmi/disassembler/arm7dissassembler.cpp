@@ -46,9 +46,67 @@ std::string Arm7Dissassembler::get_condition_code(uint32_t opcode)
         case Arm7TDMI::ConditionCode::GT: return "GT";
         case Arm7TDMI::ConditionCode::LE: return "LE";
         case Arm7TDMI::ConditionCode::AL: return "";
-        default: break;
+        default: return "NV"; // Forbidden condition code
     }
 
+    return "";
+}
+
+std::string Arm7Dissassembler::decode_bios_function(uint32_t value)
+{
+    switch (value)
+    {
+        // Basic Functions
+        case 0x00: return "SoftReset";
+        case 0x01: return "RegisterRamReset";
+        case 0x02: return "Halt";
+        case 0x03: return "Stop";
+        case 0x04: return "IntrWait";
+        case 0x05: return "VBlankIntrWait";
+        case 0x06: return "Div";
+        case 0x07: return "DivArm";
+        case 0x08: return "Sqrt";
+        case 0x09: return "ArcTan";
+        case 0x0A: return "ArcTan2";
+        case 0x0B: return "CpuSet";
+        case 0x0C: return "CpuFastSet";
+        case 0x0D: return "GetBiosChecksum";
+        case 0x0E: return "BgAffineSet";
+        case 0x0F: return "ObjAffineSet";
+
+        // Decompression Functions
+        case 0x10: return "BitUnpack";
+        case 0x11: return "LZ77UnCompReadNormalWrite8bit";
+        case 0x12: return "LZ77UnCompReadNormalWrite16bit";
+        case 0x13: return "HuffUnCompReadNormal";
+        case 0x14: return "RLUnCompReadNormalWrite8bit";
+        case 0x15: return "RLUnCompReadNormalWrite16bit";
+        case 0x16: return "Diff8bitUnFilterWrite8bit";
+        case 0x17: return "Diff8bitUnFilterWrite16bit";
+        case 0x18: return "Diff16bitUnFilter";
+
+        // Sound Functions
+        case 0x19: return "SoundBias";
+        case 0x1A: return "SoundDriverInit";
+        case 0x1B: return "SoundDriverMode";
+        case 0x1C: return "SoundDriverMain";
+        case 0x1D: return "SoundDriverVSync";
+        case 0x1E: return "SoundChannelClear";
+        case 0x1F: return "MidiKey2Freq";
+        case 0x20: return "SoundWhatever0";
+        case 0x21: return "SoundWhatever1";
+        case 0x22: return "SoundWhatever2";
+        case 0x23: return "SoundWhatever3";
+        case 0x24: return "SoundWhatever4";
+        case 0x25: return "MultiBoot";
+        case 0x26: return "HardReset";
+        case 0x27: return "CustomHalt";
+        case 0x28: return "SoundDriverVSyncOff";
+        case 0x29: return "SoundDriverVSyncOn";
+        case 0x2A: return "SoundGetJumpList";
+
+        default: return "Uknown (" + std::to_string(value) + ")";
+    }
     return "";
 }
 
