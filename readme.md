@@ -8,7 +8,7 @@ This is a WIP Game Boy Advance Emulator.
 | Mode 0 (Tonc Demo) | Mode 3 (Tonc Demo) | Mode 4 (Tonc Demo) |
 |:---:|:---:|:---:|
 | ![Mode 0 Tonc](./showcase/bigmap_demo.png) | ![Mode 3 Tonc](./showcase/mode3_demo2.png) | ![Mode 4 Tonc](./showcase/keypad_demo2.png) |
-| Kirby Nightmare In Dream Land | Open Lara | | Mode 3 (Panda Demo)
+| Kirby Nightmare In Dream Land | Open Lara | | Mode 3 (Panda Demo) |
 | ![Kirby](./showcase/Kirby.png) | ![Open Lara](./showcase/openlara2.png) | ![Mode 3 Panda](./showcase/mode3_panda.png) |
 
 </div>
