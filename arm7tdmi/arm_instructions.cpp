@@ -211,9 +211,10 @@ Arm7TDMI::NextPCFetch Arm7TDMI::arm_data_processing(uint32_t opcode)
             cpsr = get_mode_spsr(curr_mode);
             handle_mode_switch(cpsr & ProgramStatusRegsiter::Mode);
         }
+
         if (operation < AluOps::Tst || operation > AluOps::Cmn)
         {
-            reload_pipeline32(r15 + 8);
+            (is_thumb()) ? reload_pipeline16(r15 + 4) : reload_pipeline32(r15 + 8);
         }
     }
 

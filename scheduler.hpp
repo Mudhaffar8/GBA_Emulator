@@ -15,7 +15,11 @@ public:
         VBlankEnter,
         VBlankExit,
         HBlankEnter,
-        HBlankExit
+        HBlankExit,
+        DMA0,
+        DMA1,
+        DMA2,
+        DMA3
     };
 
     struct Event 

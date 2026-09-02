@@ -365,7 +365,7 @@ public:
         if (access_type != AccessType::None)
             accesses.insert_or_assign(address, std::make_pair("write8", access_type));
         
-        inner_write(val, address);
+        inner_write(val & 0xFF, address);
 
         if constexpr(std::is_same<T, uint32_t>::value || std::is_same<T, uint16_t>::value) 
             inner_write((val >> 8) & 0xFF, address + 1);

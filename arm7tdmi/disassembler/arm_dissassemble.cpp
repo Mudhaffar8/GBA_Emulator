@@ -245,7 +245,9 @@ std::string Arm7Dissassembler::arm_software_interrupt_dissassemble(uint32_t opco
 { 
     uint32_t value24 = Utils::get_bits(opcode, 0, 24);
 
-    return "SWI " + get_condition_code(opcode) + decode_bios_function(value24);
+    std::string instruction = "SWI" + get_condition_code(opcode);
+    instruction += " " + decode_bios_function(value24);
+    return instruction;
 }
 
 std::string Arm7Dissassembler::arm_single_data_swap_dissassemble(uint32_t opcode) 

@@ -3,6 +3,7 @@
 #include "memory.hpp"
 #include "memory_regions.hpp"
 #include "io_register.hpp"
+#include "interrupts.hpp"
 #include "scheduler.hpp"
 
 class DMA
@@ -10,38 +11,44 @@ class DMA
 public: 
     DMA(Memory& memory, Scheduler& scheduler);
 
+    void handle_dma_event(Scheduler::EventType dma_event);
+
 private:
     enum DMAControl
     {
-        NumOfTransfer = 0xF,
-        ChunkSize = (1 << 0x1A), // 0 = Halfword, 1 = word
-        Repeat = (1 << 0x19), // Repeat at each copy at each VBlank or HBlank
-        RaiseIRQ = (1 << 0x1E), // Raise IRQ when finished
-        DMAEnable = (1 << 0x1F)
+        Unused = 0x1F,
+        DstAddrControl = (0b11 << 5),
+        SrcAddrControl = (0b11 << 7),
+        DMARepeat = (1 << 9),
+        DMATransferType = (1 << 10),
+        GamePakDRQ = (1 << 11),
+        DMAStartTiming = (0b11 << 12),
+        IRQOnEnd = (1 << 14),
+        DMAEnable = (1 << 15)
     };
 
     enum DestinationAdjustment
     {
-        IncrementAfter = (0b00 << 0x15),
-        DecrementAfter = (0b01 << 0x15),
-        None = (0b10 << 0x15),
-        IncrementDestination = (0b11 << 0x15)
+        IncrementAfter = (0b00 << 5),
+        DecrementAfter = (0b01 << 5),
+        None = (0b10 << 5),
+        IncrementReload = (0b11 << 5)
     };
 
     enum SourceAdjustment
     {
-        IncrementAfter = (0b00 << 0x17),
-        DecrementAfter = (0b01 << 0x17),
-        None = (0b10 << 0x17),
-        Forbidden = (0b11 << 0x17)
+        IncrementAfter = (0b00 << 7),
+        DecrementAfter = (0b01 << 7),
+        None = (0b10 << 7),
+        Forbidden = (0b11 << 7)
     };
 
     enum TimingMode 
     {
-        Now = (0b00 << 0x17),
-        OnVBlank = (0b01 << 0x17),
-        OnHBlank = (0b10 << 0x17),
-        OnRefresh = (0b11 << 0x17), 
+        Now = (0b00 << 12),
+        OnVBlank = (0b01 << 12),
+        OnHBlank = (0b10 << 12),
+        OnRefresh = (0b11 << 12)
     };
 
     Memory& memory;
@@ -70,4 +77,7 @@ private:
     Io16<GBAIO::DMA1CNT_H> dma1_control;
     Io16<GBAIO::DMA2CNT_H> dma2_control;
     Io16<GBAIO::DMA3CNT_H> dma3_control;
+
+    template<uint32_t T, uint32_t U, uint32_t V>
+    void transfer(Io32<T> src_addr, Io32<U> dst_addr, Io16<V> dma_control, int chunk_transfer_amount);
 };

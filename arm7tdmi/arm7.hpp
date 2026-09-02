@@ -351,8 +351,6 @@ private:
 
     inline void reload_pipeline16(uint32_t new_pc)
     {
-        assert(is_thumb_mode());
-
         r15 = new_pc;
 
         (void)memory.read<uint16_t>(r15 - 4, AccessType::NonSequential);

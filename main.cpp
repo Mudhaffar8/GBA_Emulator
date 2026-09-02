@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "arm7tdmi/arm7.hpp"
 #include "arm7tdmi/disassembler/arm7dissassembler.hpp"
 #include "display.hpp"
@@ -11,6 +9,9 @@
 #include "scheduler.hpp"
 #include "tests.hpp"
 #include "utils.hpp"
+
+#include <deque>
+#include <iostream>
 
 // Things to look into: passing armwrestler.gba, memory.gba
 
@@ -24,7 +25,7 @@ int main(int argc, char** argv)
     GBATests::run_test(cpu, test_memory, "thumb_push_pop.json");
     #else
 
-    constexpr int MAX_LOG_TRACE = 50;
+    constexpr int MAX_LOG_TRACE = 50'000;
 
     bool debug_mode = std::string(argv[3]) == "t";
 
@@ -51,13 +52,13 @@ int main(int argc, char** argv)
     Display display;
 
     Arm7Dissassembler disassembler(memory);
-    std::vector<std::pair<uint32_t, bool>> debug_trace{};
-    std::vector<std::array<uint32_t, 16>> register_states{};
-    std::vector<uint32_t> cpsr_trace{};
+    std::deque<std::pair<uint32_t, bool>> debug_trace{};
+    std::deque<std::array<uint32_t, 16>> register_states{};
+    std::deque<uint32_t> cpsr_trace{};
 
-    cpsr_trace.reserve(MAX_LOG_TRACE);
-    register_states.reserve(MAX_LOG_TRACE);
-    debug_trace.reserve(MAX_LOG_TRACE);
+    cpsr_trace.resize(MAX_LOG_TRACE);
+    register_states.resize(MAX_LOG_TRACE);
+    debug_trace.resize(MAX_LOG_TRACE);
 
     while (display.get_running_status())
     {   
@@ -72,19 +73,19 @@ int main(int argc, char** argv)
                 // Next will be porting this to IMGUI
                 if (debug_mode)
                 {
-                    if (debug_trace.size() == debug_trace.capacity())
-                        debug_trace.erase(debug_trace.begin());
+                    if (debug_trace.size() == MAX_LOG_TRACE)
+                        debug_trace.pop_front();
                     
                     debug_trace.emplace_back(address, cpu.is_thumb());
                 } 
                 cpu.tick();
                 if (debug_mode)
                 {
-                    if (register_states.size() == register_states.capacity())
-                        register_states.erase(register_states.begin());
+                    if (register_states.size() == MAX_LOG_TRACE)
+                        register_states.pop_front();
                     
-                    if (cpsr_trace.size() == cpsr_trace.capacity())
-                        cpsr_trace.erase(cpsr_trace.begin());
+                    if (cpsr_trace.size() == MAX_LOG_TRACE)
+                        cpsr_trace.pop_front();
                     
                     std::array<uint32_t, 16> registers{};
                     for (int i = 0; i < 16; ++i)
@@ -92,9 +93,9 @@ int main(int argc, char** argv)
 
                     cpsr_trace.emplace_back(cpu.get_cpsr());
                     register_states.emplace_back(registers);              
-                }
+                } 
 
-                if (address == Arm7VectorAddr::RESET)
+                if (address == Arm7VectorAddr::RESET) // || address == 0x8000aac
                 {
                     display.get_running_status() = false;
                     break;
@@ -133,7 +134,7 @@ int main(int argc, char** argv)
                 double diff = std::chrono::duration<double, std::milli>(end - start).count();
 
                 uint32_t time = (diff < 15) ? (15 - diff) : 0;
-                if (!debug_mode) SDL_Delay(time);
+                SDL_Delay(time);
             }
             ppu.exit_vblank();
             scheduler.add_event(Scheduler::EventType::VBlankExit, GBATiming::REFRESH_RATE - late_cycles);
@@ -151,6 +152,12 @@ int main(int argc, char** argv)
             ppu.exit_hblank();
             scheduler.add_event(Scheduler::EventType::HBlankExit, GBATiming::SCANLINE - late_cycles);
             break;
+
+        case Scheduler::EventType::DMA0:
+        case Scheduler::EventType::DMA1:
+        case Scheduler::EventType::DMA2:
+        case Scheduler::EventType::DMA3:
+            break;
         
         default:
             break;
@@ -159,7 +166,7 @@ int main(int argc, char** argv)
 
     if (debug_mode)
     {
-        std::ofstream debug_file("./debug_trace.txt");
+        std::ofstream debug_file("./trace_logs/debug_trace.txt");
         
         if (debug_file.is_open())
         {

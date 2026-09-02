@@ -153,7 +153,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_alu_operations(uint16_t opcode)
                 set_cpsr(ProgramStatusRegsiter::C, Utils::is_bit_set(dest_register, 31));
             }
             else  
-                dest_register = alu_ror(dest_register, src_register & 0xFF, true);
+                dest_register = alu_ror(dest_register, src_register & 0x1F, true);
         }
         break;
     case 0b1000: // TST Rd, Rs -> Set Condition codes on Rd AND Rs
@@ -311,7 +311,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_halfword(uint16_t opcode)
 
         // LDRH Rd,[odd] -->  LDRH Rd,[odd-1] ROR 8  ;read to bit0-7 and bit24-31
         // Why doesn't NBA half-word align the address before loading it?
-        uint16_t val = memory.read<uint16_t>(total_offset, AccessType::NonSequential);
+        uint16_t val = memory.read<uint16_t>(total_offset & ~1, AccessType::NonSequential);
         dst_src_register = (total_offset & 1) ? alu_ror(val, 8, false) : val;
 
         return NextPCFetch::Sequential;
@@ -350,7 +350,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_immediate(uint16_t opcode)
             dst_src_register = memory.read<uint8_t>(final_offset, AccessType::NonSequential);
         else 
         {
-            uint32_t val = memory.read<uint32_t>(final_offset, AccessType::NonSequential);
+            uint32_t val = memory.read<uint32_t>(final_offset & ~3, AccessType::NonSequential);
             dst_src_register = (final_offset & 3) ? alu_ror(val, (final_offset & 3) * 8, false) : val;
         }
 
@@ -400,7 +400,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t o
         if (h_flag)
         {
             dst_register = (final_offset & 1) ? 
-                Utils::sign_extend32(memory.read<uint8_t>(final_offset + 1, AccessType::NonSequential), 0, 7) : 
+                Utils::sign_extend32(memory.read<uint8_t>(final_offset, AccessType::NonSequential), 0, 7) : 
                 Utils::sign_extend32(memory.read<uint16_t>(final_offset, AccessType::NonSequential), 0, 15);
         } 
         else
@@ -414,7 +414,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_sign_extend_halfword(uint16_t o
         {
             memory.add_internal_cycles();
 
-            uint16_t val = memory.read<uint16_t>(final_offset, AccessType::NonSequential);
+            uint16_t val = memory.read<uint16_t>(final_offset & ~1, AccessType::NonSequential);
             dst_register = (final_offset & 1) ? alu_ror(val, 8, false) : val;
 
             return NextPCFetch::Sequential;
@@ -455,7 +455,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_load_store_w_reg_offset(uint16_t opcode)
             dst_register = memory.read<uint8_t>(final_addr, AccessType::NonSequential);
         else 
         {
-            uint32_t val = memory.read<uint32_t>(final_addr, AccessType::NonSequential);
+            uint32_t val = memory.read<uint32_t>(final_addr & ~3, AccessType::NonSequential);
             // Reads from forcibly aligned address “addr AND (NOT 3)”, and does then rotate the data as “ROR (addr AND 3)*8”
             dst_register = (final_addr & 3) ? alu_ror(val, (final_addr & 3) * 8, false) : val;
         }
@@ -772,7 +772,7 @@ Arm7TDMI::NextPCFetch Arm7TDMI::thumb_sp_relative_load_store(uint16_t opcode)
         memory.add_internal_cycles();
         
         // Reads from forcibly aligned address “addr AND (NOT 3)”, and does then rotate the data as “ROR (addr AND 3)*8”
-        uint32_t val = memory.read<uint32_t>(new_addr, AccessType::NonSequential);
+        uint32_t val = memory.read<uint32_t>(new_addr & ~3, AccessType::NonSequential);
         dest_register = (new_addr & 3) ? alu_ror(val, (new_addr & 3) * 8, false) : val;
         
         return NextPCFetch::Sequential;

@@ -311,7 +311,6 @@ void Graphics::write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint
 
 void Graphics::render_sprites_scanline(uint16_t screen_y)
 {
-    /// @todo This should be done in reverse order
     for (int i = 127; i >= 0; --i)
     {
         /*
@@ -319,12 +318,12 @@ void Graphics::render_sprites_scanline(uint16_t screen_y)
         OAM Write: 1000000 @ address 7000004
         */
         Sprite sprite = memory.read_oam64(i * 8);
-
         if (sprite.obj_mode() == ObjMode::Disabled) continue;
 
         auto [width, height] = shape_size.at(sprite.shape()).at(sprite.size());
-        if (sprite.y() + height <= static_cast<int>(screen_y) ||
-            sprite.y() > static_cast<int>(screen_y)
+        if ((sprite.y() > static_cast<int>(screen_y) &&
+            ((sprite.y() + height) & 0xFF) >= static_cast<int>(screen_y)) ||
+            (((sprite.y() + height) & 0xFF) < static_cast<int>(screen_y))
         ) continue;
 
         (sprite.obj_mode() == ObjMode::Normal) ? 
@@ -336,7 +335,6 @@ void Graphics::render_sprites_scanline(uint16_t screen_y)
 void Graphics::render_normal_sprite_scanline(Sprite s, Dimensions dimensions, uint16_t screen_y) 
 {
     int tile_map_y = (screen_y - s.y()) & 0xFF;
-    if (tile_map_y >= GBARes::LCD_H) return;
 
     int tile_y = (tile_map_y / 8);
     int tile_row_y = (tile_map_y % 8);

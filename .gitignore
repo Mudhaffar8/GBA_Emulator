@@ -1,6 +1,7 @@
 **/test_roms/
 **/v1/
 **/.vscode/
+**/trace_logs/
 
 json.hpp
 debug_trace.txt

@@ -152,7 +152,7 @@ std::string Arm7Dissassembler::thumb_load_store_sign_extend_halfword_dissassembl
     bool is_sign_extended = Utils::is_bit_set(opcode, 10);
     bool h_flag = Utils::is_bit_set(opcode, 11);
 
-    std::string instruction = (is_sign_extended) ? (h_flag ? "LDSH " : "LDSB ") : (h_flag ? "STRH " : "LDRH ");
+    std::string instruction = (is_sign_extended) ? (h_flag ? "LDSH " : "LDSB ") : (h_flag ? "LDRH " : "STRH ");
     instruction += dst_src_register + ", [" + base_register + ", ";
     instruction += "R" + std::to_string(offset_reg_index) + "]";
 
@@ -290,7 +290,8 @@ std::string Arm7Dissassembler::thumb_software_interrupt_dissassemble(uint16_t op
 {
     uint32_t value8 = Utils::get_bits(opcode, 0, 8);
 
-    std::string instruction = "SWI " + decode_bios_function(value8);
+    std::string instruction = "SWI" + get_condition_code(opcode); 
+    instruction += " " + decode_bios_function(value8);
     return instruction;
 }
 
