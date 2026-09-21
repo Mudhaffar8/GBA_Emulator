@@ -15,6 +15,8 @@
 
 // Things to look into: passing armwrestler.gba, memory.gba
 
+#define CPU_SPEED_TEST
+
 int main(int argc, char** argv)
 {
     #ifdef RUN_JSON_TESTS
@@ -22,10 +24,17 @@ int main(int argc, char** argv)
     TestMemory test_memory;
     Arm7TDMI cpu(test_memory);
     
-    GBATests::run_test(cpu, test_memory, "thumb_push_pop.json");
+    GBATests::run_all_tests(cpu, test_memory);
+
     #else
 
     constexpr int MAX_LOG_TRACE = 50'000;
+
+    const std::vector<uint32_t> breakpoints = {{
+        Arm7VectorAddr::RESET,
+        // 0x8000168 // retAddr.gba
+        // 0x800aac8 // OpenLara
+    }};
 
     bool debug_mode = std::string(argv[3]) == "t";
 
@@ -95,7 +104,8 @@ int main(int argc, char** argv)
                     register_states.emplace_back(registers);              
                 } 
 
-                if (address == Arm7VectorAddr::RESET) // || address == 0x8000aac
+                if (auto it = std::find(breakpoints.begin(), breakpoints.end(), address);
+                    it != breakpoints.end()) 
                 {
                     display.get_running_status() = false;
                     break;
@@ -133,7 +143,7 @@ int main(int argc, char** argv)
                 auto end = std::chrono::steady_clock::now();
                 double diff = std::chrono::duration<double, std::milli>(end - start).count();
 
-                uint32_t time = (diff < 15) ? (15 - diff) : 0;
+                uint32_t time = (diff < 12) ? (12 - diff) : 0;
                 SDL_Delay(time);
             }
             ppu.exit_vblank();
@@ -166,7 +176,7 @@ int main(int argc, char** argv)
 
     if (debug_mode)
     {
-        std::ofstream debug_file("./trace_logs/debug_trace.txt");
+        std::ofstream debug_file("./trace_logs/debug.txt");
         
         if (debug_file.is_open())
         {

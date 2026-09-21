@@ -8,8 +8,8 @@
 #include <type_traits>
 
 #include "arm7tdmi/arm7.hpp"
-#include "utils.hpp"
 #include "memory.hpp"
+#include "utils.hpp"
 
 #include "json.hpp"
 

@@ -230,11 +230,13 @@ void Arm7TDMI::handle_irq()
     
     spsr_irq = cpsr;
 
-    handle_state_switch(ArmState::Arm);
+    // Wow that took way longer than it really needed
     handle_mode_switch(ArmMode::InterruptRequest);
+    get_link() = is_thumb() ? r15 : r15 - 4;
+
+    handle_state_switch(ArmState::Arm);
     set_cpsr(ProgramStatusRegsiter::I, true);
      
-    r14_irq = r15 - (is_thumb_mode() ? 2 : 4);
     reload_pipeline32(Arm7VectorAddr::IRQ + 8);
 }
 

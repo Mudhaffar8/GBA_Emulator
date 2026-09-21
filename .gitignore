@@ -4,7 +4,9 @@
 **/trace_logs/
 
 json.hpp
+
 debug_trace.txt
+ignore.txt
 
 *.exe
 *.dll

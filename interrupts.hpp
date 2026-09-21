@@ -25,18 +25,37 @@ namespace Interrupts
     inline void request_interrupt(Memory& mem, InterruptType interrupt) 
     {
         uint16_t if_flag = mem.get_if();
-        // std::cout << "IF OLD: " << std::bitset<16>(if_flag) << '\n';
         mem.write_io16(if_flag | static_cast<uint16_t>(interrupt), GBAIO::IF);
-        // std::cout << "IF NEW: " << std::bitset<16>(if_flag) << '\n';
     }
-    inline void unset_interrupt(Memory& mem, InterruptType interrupt) {}
+    inline void unset_interrupt(Memory& mem, InterruptType interrupt) 
+    {
+        uint16_t if_flag = mem.get_if();
+        mem.write_io16(if_flag & ~static_cast<uint16_t>(interrupt), GBAIO::IF);
+    }
 
-    inline void enable_interrupt(Memory& mem, InterruptType interrupt) {}
-    inline void disable_interrupt(Memory& mem, InterruptType interrupt) {}
+    inline void enable_interrupt(Memory& mem, InterruptType interrupt) 
+    {
+        uint16_t ie_flag = mem.get_ie();
+        mem.write_io16(ie_flag | static_cast<uint16_t>(interrupt), GBAIO::IE);
+    }
+    inline void disable_interrupt(Memory& mem, InterruptType interrupt) 
+    {
+        uint16_t ie_flag = mem.get_ie();
+        mem.write_io16(ie_flag & ~static_cast<uint16_t>(interrupt), GBAIO::IE);
+    }
 
     /* Checking Interrupts */
+    inline bool is_interrupt_requested(Memory& mem, InterruptType interrupt) 
+    { 
+        return mem.get_if() & static_cast<uint16_t>(interrupt); 
+    }
+    inline bool is_interrupt_enabled(Memory& mem, InterruptType interrupt)
+    { 
+        return mem.get_ie() & static_cast<uint16_t>(interrupt); 
+    }
     // Check if interrupt is request and enabled
-    inline bool is_interrupt_queued(Memory& mem, InterruptType interrupt) { return false; } 
-    inline bool is_interrupt_requested(Memory& mem, InterruptType interrupt) { return false; }
-    inline bool is_interrupt_enabled(Memory& mem, InterruptType interrupt) { return false; }
+    inline bool is_interrupt_queued(Memory& mem, InterruptType interrupt) 
+    { 
+        return is_interrupt_requested(mem, interrupt) && is_interrupt_enabled(mem, interrupt); 
+    } 
 }

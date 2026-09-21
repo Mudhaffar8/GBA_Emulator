@@ -14,21 +14,14 @@ This is a WIP Game Boy Advance Emulator.
 </div>
 
 ## Current Features
-- A fully-working ARM7TDMI cpu interpreter, passing the [FUZZARM](https://github.com/DenSinH/FuzzARM) rom test and [SingleStepTest's ARM7TDMI Test Suite<sup>1</sup>](https://github.com/SingleStepTests/ARM7TDMI). 
+- A fully-working ARM7TDMI cpu interpreter, passing the [FUZZARM](https://github.com/DenSinH/FuzzARM) and [ARM Wrestler](https://github.com/mic-/armwrestler) rom tests. 
 - A decoupled ARM7TDMI disassembler.
 - SDL3 for window and input handling.
 - Support for PPU modes 0, 3, and 4.
 
-<i>
-    1. With the exception of the result of the carry flag for any MULT Instruction. 
-    The result of the carry flag is UNPREDICTABLE (per the ARM7TDMI documentation and GBATEK) 
-    and no exisitng GBA game (to my knowledge) relies on it, so this emulator either sets it to a garbage value
-    or leaves it be.
-</i>
 
 ## Planned Updates
 - Work on passing more GBA test roms:
-    - ArmWrestler
     - Jsmolka's CPU & memory Tests
 - Continue working on and completing the PPU:
     - Adding Modes 1, and 2
