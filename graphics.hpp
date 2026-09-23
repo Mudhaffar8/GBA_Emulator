@@ -11,7 +11,7 @@
 class Graphics
 {
 public:
-    explicit Graphics(Memory& memory);
+    Graphics(Memory& memory);
 
     enum Dispcnt 
     {
@@ -42,6 +42,24 @@ public:
         VCountSetting = 0xFF00, // Basically LYC (0..227)
     };
 
+    struct PixelInfo
+    {
+        uint16_t priority{};
+        uint16_t colour{}; 
+
+        PixelInfo() {}
+        PixelInfo(uint16_t _colour) : priority(0), colour(_colour) {}
+        PixelInfo(uint16_t _priority, uint16_t _colour) : priority(_priority), colour(_colour) {}
+
+        void operator=(PixelInfo colour_info)
+        {
+            priority = colour_info.priority;
+            colour = colour_info.colour;
+        }
+    };
+
+    using PixelBuffer = std::array<PixelInfo, GBARes::Resolution>;
+
     /* Event Handling */
     void enter_hblank();
     void enter_vblank();
@@ -50,7 +68,7 @@ public:
 
     void render_scanline();
 
-    const std::array<uint32_t, GBARes::Resolution>& get_frame_buffer() const { return frame_buffer; }
+    const PixelBuffer& get_pixel_buffer() const { return pixel_buffer; }
 
 private:
     template <typename T>
@@ -80,21 +98,6 @@ private:
         uint16_t bg_control;
         uint16_t x, y;
         bool enable;
-    };
-
-    struct PixelInfo
-    {
-        int priority{};
-        uint16_t colour{}; 
-
-        PixelInfo() {}
-        PixelInfo(int _priority, uint16_t _colour) : priority(_priority), colour(_colour) {}
-
-        void operator=(PixelInfo colour_info)
-        {
-            priority = colour_info.priority;
-            colour = colour_info.colour;
-        }
     };
 
     struct ScreenEntry
@@ -201,8 +204,7 @@ private:
     Io16<GBAIO::BLDALPHA> alpha_blend_coefficients;
     Io16<GBAIO::BLDY> brightness_coefficient;
 
-    std::array<uint16_t, GBARes::LCD_W> scanline{};
-    std::array<uint32_t, GBARes::Resolution> frame_buffer{};
+    PixelBuffer pixel_buffer{};
 
     /* Scanline Rendering */
     void render_scanline_mode0(uint16_t screen_y);

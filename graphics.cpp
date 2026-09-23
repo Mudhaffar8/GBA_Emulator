@@ -5,6 +5,8 @@
 #include <cassert>
 #include <algorithm>
 
+const Graphics::PixelInfo CLEAR_PIXEL = {0, 0};
+
 Graphics::Graphics(Memory& _memory) : 
     memory(_memory),
     dispcnt(_memory),
@@ -97,7 +99,11 @@ void Graphics::render_scanline_mode0(uint16_t screen_y)
 {
     if (screen_y >= GBARes::LCD_H) return;
 
-    std::fill(scanline.begin(), scanline.end(), 0);
+    std::fill(
+        pixel_buffer.begin() + (screen_y * GBARes::LCD_W), 
+        pixel_buffer.begin() + ((screen_y + 1) * GBARes::LCD_W), 
+        CLEAR_PIXEL
+    );
 
     bool bg0_enable = (dispcnt & Dispcnt::ScreenEnableBG0) != 0;
     bool bg1_enable = (dispcnt & Dispcnt::ScreenEnableBG1) != 0;
@@ -126,9 +132,6 @@ void Graphics::render_scanline_mode0(uint16_t screen_y)
 
     if (dispcnt & Dispcnt::SpriteEnable)
         render_sprites_scanline(screen_y);
-
-    for (int i = 0; i < GBARes::LCD_W; ++i)
-        frame_buffer.at(i + (screen_y * GBARes::LCD_W)) = Utils::convert_bgr555_to_rgba32(scanline[i]);
 }
 
 /* Bit Map Modes*/
@@ -147,7 +150,7 @@ void Graphics::render_scanline_mode3(uint16_t screen_y)
     for (int x = 0; x < GBARes::LCD_W; ++x)
     {
         uint16_t color = memory.read_vram16((x + height) * 2);
-        frame_buffer.at(x + height) = Utils::convert_bgr555_to_rgba32(color);
+        pixel_buffer.at(x + height) = {color};
     }
 }
 
@@ -170,8 +173,8 @@ void Graphics::render_scanline_mode4(uint16_t screen_y)
         uint16_t color1 = memory.read_palette_data16(palette_index1 * 2);
         uint16_t color2 = memory.read_palette_data16(palette_index2 * 2);
 
-        frame_buffer.at(coords) = Utils::convert_bgr555_to_rgba32(color1);
-        frame_buffer.at(coords + 1) = Utils::convert_bgr555_to_rgba32(color2);
+        pixel_buffer.at(coords) = {color1};
+        pixel_buffer.at(coords + 1) = {color2};
     }
 
     if (dispcnt & Dispcnt::SpriteEnable)
@@ -198,11 +201,11 @@ void Graphics::render_scanline_mode5(uint16_t screen_y)
             int coords = (x + height) * 2;
 
             uint16_t color = memory.read_vram16(bitmap_start_addr + coords);
-            frame_buffer.at(x + height) = Utils::convert_bgr555_to_rgba32(color);
+            pixel_buffer.at(x + height) = {color};
         }
     }
     for (; x < GBARes::LCD_W; ++x)
-        frame_buffer.at(x + height) = Utils::convert_bgr555_to_rgba32(0);
+        pixel_buffer.at(x + height) = CLEAR_PIXEL;
 }
 
 void Graphics::render_text_bg_scanline(TileMapCoords bg_offset, uint16_t screen_y, uint16_t bg_control)
@@ -287,6 +290,8 @@ template <Graphics::TileType T>
 void Graphics::write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint16_t palette_index, bool flip_x, bool is_8bpp)
 {
     if (screen_coords.y >= GBARes::LCD_H) return;
+
+    int height = screen_coords.y * GBARes::LCD_W;
     
     for (int i = 0; i < 8; ++i)
     {
@@ -305,7 +310,7 @@ void Graphics::write_tile_row(ScreenCoords screen_coords, TileRow tile_row, uint
 
         uint16_t palette_color = memory.read_palette_data16(colour_index_addr);
         
-        scanline.at(pixel_screen_x) = palette_color;
+        pixel_buffer.at(pixel_screen_x + height) = palette_color;
     }
 }
 
@@ -425,6 +430,8 @@ void Graphics::render_affine_sprite_scanline(Sprite sprite, Dimensions dimension
     // Convert to model coordinates
     double model_y = static_cast<double>(q_origin.y + qy);
 
+    int height = screen_y * GBARes::LCD_W;
+
     for (int qx = -clipping_area_width_half; qx < clipping_area_width_half; ++qx)
     {
         // (pa * qx) + (pb * qy) = tx
@@ -447,7 +454,7 @@ void Graphics::render_affine_sprite_scanline(Sprite sprite, Dimensions dimension
         int screen_x = (sprite.x() + qx) & 0x1FF;
         if (screen_x < 0 || screen_x >= GBARes::LCD_W) continue;
         
-        scanline.at(screen_x) = palette_color;
+        pixel_buffer.at(height + screen_x) = {palette_color};
     }
 }
 

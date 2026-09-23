@@ -1,5 +1,6 @@
 #pragma once
 
+#include "graphics.hpp"
 #include "graphics_settings.hpp"
 
 #include <array>
@@ -21,8 +22,8 @@ public:
     /// @brief Polls SDL events.
     void handle_events();
 
-    /// @brief Updates screen using PPU's current frame buffer.
-    void update_screen(const std::array<uint32_t, GBARes::Resolution>& frame_buffer);
+    /// @brief Updates screen using PPU's current pixel frame buffer.
+    void update_screen(const Graphics::PixelBuffer& pixel_buffer);
 
     /* Getters & Setters */
     inline bool& get_running_status() { return is_running; }

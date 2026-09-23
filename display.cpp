@@ -90,14 +90,15 @@ void Display::handle_events()
     }
 }
 
-void Display::update_screen(const std::array<uint32_t, GBARes::Resolution>& frame_buffer)
+void Display::update_screen(const Graphics::PixelBuffer& pixel_buffer)
 {
     int pitch = 0;
     uint32_t* pixels = nullptr;
 
     SDL_LockTexture(texture, nullptr, (void**)(&pixels), &pitch);
 
-    std::copy(frame_buffer.begin(), frame_buffer.end(), pixels);
+    for (int i = 0; i < GBARes::Resolution; ++i)
+        pixels[i] = Utils::convert_bgr555_to_rgba32(pixel_buffer[i].colour);
 
     SDL_UnlockTexture(texture);
 

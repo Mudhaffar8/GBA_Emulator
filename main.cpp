@@ -13,7 +13,7 @@
 #include <deque>
 #include <iostream>
 
-// Things to look into: passing armwrestler.gba, memory.gba
+// Things to look into: passing memory.gba
 
 #define CPU_SPEED_TEST
 
@@ -69,10 +69,10 @@ int main(int argc, char** argv)
     register_states.resize(MAX_LOG_TRACE);
     debug_trace.resize(MAX_LOG_TRACE);
 
+    auto start = std::chrono::steady_clock::now();
+
     while (display.get_running_status())
     {   
-        auto start = std::chrono::steady_clock::now();
-
         if (!memory.cpu_is_halted)
         {
             while (!scheduler.next_event_pending() && !memory.cpu_is_halted) 
@@ -130,7 +130,7 @@ int main(int argc, char** argv)
         {
         case Scheduler::EventType::VBlankEnter:
             display.handle_events();
-            display.update_screen(ppu.get_frame_buffer());
+            display.update_screen(ppu.get_pixel_buffer());
             ppu.enter_vblank();
             scheduler.add_event(Scheduler::EventType::VBlankEnter, GBATiming::REFRESH_RATE - late_cycles);
             break;
@@ -143,8 +143,10 @@ int main(int argc, char** argv)
                 auto end = std::chrono::steady_clock::now();
                 double diff = std::chrono::duration<double, std::milli>(end - start).count();
 
-                uint32_t time = (diff < 12) ? (12 - diff) : 0;
+                uint32_t time = (diff < 16.6) ? (16.6 - diff) : 0;
                 SDL_Delay(time);
+
+                start = std::chrono::steady_clock::now();
             }
             ppu.exit_vblank();
             scheduler.add_event(Scheduler::EventType::VBlankExit, GBATiming::REFRESH_RATE - late_cycles);
